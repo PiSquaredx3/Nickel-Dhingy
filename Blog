@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<!make a motd with different designs for site logo
+different pages have different gradient setups>
+<html>
+    
+<head>
+    <title>NickleDhingy.net</title>
+    
+    <style>
+        
+        body {
+        
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background: linear-gradient(to left, #00e1ff, rgb(255, 255, 255) 20%);
+            color: #000000;
+            margin: 0px;
+            padding: 0px;
+
+        }
+        #container {
+            
+            width: 100%;
+            background-color: #ffffff;
+            padding-right: 0px;
+            background: linear-gradient(to left, #00e1ff, rgb(255, 255, 255) 20%);
+        }
+        #header {
+            background-color: #8af1ff;
+            width: 90%;
+            color: black;
+            padding: 10px;
+            font-size: 32px;
+            font-weight: bold;
+            text-align: left;
+            border-bottom-right-radius: 20px;
+            position: relative;
+            z-index: 9999;
+            box-shadow: black 1px 1px 10px 0px;
+        }
+        #header2 {
+            background-color: #68dffd;
+            width: 200px;
+            color: black;
+            padding: 10px;
+            font-size: 32px;
+            font-weight: bold;
+            text-align: center;
+            border-bottom-right-radius: 20px;
+            position: relative;
+            z-index: 500;
+            
+        }
+        #navbar {
+            width: 300px;
+            background-color: #0000ff;
+            margin-left: 200px;
+            margin-top: -64px;
+            padding-left: 20px;
+            text-align: left;
+            font-size: 20px;
+            border-bottom-right-radius: 20px;
+            position: relative;
+            z-index: 1;
+        }
+        #navbar a {
+            color: rgb(255, 255, 255);
+            text-decoration: none;
+            margin: 0 10px;
+            font-weight: bold;
+        }
+        #content {
+            padding-left: 100px;
+            padding-top: 50px;
+            font-size: 16px;
+    
+        }
+        #footer {
+            position:fixed;
+            bottom: 0;
+            width: 100%;
+            background: rgba(255, 255, 255, 0);
+            padding: 10px;
+            text-align: left;
+            font-size: 12px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="header">Nickle</div> 
+        <div id="header2">Dhingy</div>
+        <div id="navbar">
+            <a href="Main">Home</a> |
+            <a href="Blog">Blog</a>|
+            <a href="About Us">About</a>|
+        </div>
+        <div id="content">
+            <p>I'm not done stop checking</p>
+        </div>
+        <div id="footer"> Copyright blah blah blah  </div>
+    </div>
+</body>
+</html>
