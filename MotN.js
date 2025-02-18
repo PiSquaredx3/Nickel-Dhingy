@@ -5,7 +5,8 @@ const sentences = [
     "Every 60 seconds, a minute passes in Africa",
     "Hi retrodev",
     "Ask me about Earthbound, please I need someone to talk to",
-    "Neymar Jr. Add me on Steam, I don't care about Football I just like your csgo inventory"
+    "Neymar Jr. Add me on Steam, I don't care about Football I just like your csgo inventory",
+    "Bad Web Design??, nah man I'm just recreating that 2007 experience, trust me"
 ];
 
 
