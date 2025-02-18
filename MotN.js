@@ -6,7 +6,7 @@ const sentences = [
     "Hi retrodev",
     "Ask me about Earthbound, please I need someone to talk to",
     "Neymar Jr. Add me on Steam, I don't care about Football I just like your csgo inventory",
-    "Bad Web Design??, nah man I'm just recreating that 2007 experience, trust me"
+    "Bad Web Design? I'm not a spider."
 ];
 
 
