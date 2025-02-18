@@ -4,14 +4,14 @@ different pages have different gradient setups>
 <html>
     
 <head>
-    <title>NickleDhingy.net</title>
+    <title>Nickle-Dhingy</title>
     
     <style>
         
         body {
         
             font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-            background: linear-gradient(to left, #00e1ff, rgb(255, 255, 255) 20%);
+            background: linear-gradient(to left, #0000ff, rgb(255, 255, 255) 20%);
             color: #000000;
             margin: 0px;
             padding: 0px;
@@ -22,43 +22,45 @@ different pages have different gradient setups>
             width: 100%;
             background-color: #ffffff;
             padding-right: 0px;
-            background: linear-gradient(to left, #00e1ff, rgb(255, 255, 255) 20%);
+            background: linear-gradient(to left, #0000ff, rgb(255, 255, 255) 20%);
         }
         #header {
-            background-color: #8af1ff;
-            width: 90%;
-            color: black;
-            padding: 10px;
-            font-size: 32px;
-            font-weight: bold;
-            text-align: left;
-            border-bottom-right-radius: 20px;
-            position: relative;
-            z-index: 9999;
-            box-shadow: black 1px 1px 10px 0px;
-        }
+        background-image: linear-gradient(to bottom, #1a4efa, #5674fc);
+        width: 100%;
+        color: rgb(255, 255, 255);
+        padding: 10px;
+        font-size: 32px;
+        font-weight: bold;
+        text-align: left;
+        position: relative;
+        z-index: 2;
+        box-shadow: black 1px 1px 10px 0px;
+    
+        }   
+
         #header2 {
-            background-color: #68dffd;
-            width: 200px;
-            color: black;
-            padding: 10px;
-            font-size: 32px;
-            font-weight: bold;
-            text-align: center;
-            border-bottom-right-radius: 20px;
-            position: relative;
-            z-index: 500;
-            
+        background-image: linear-gradient(to bottom, #5674fc, #62aef5);
+        width: 200px;
+        color: rgb(255, 255, 255);
+        padding: 10px;
+        font-size: 32px;
+        font-weight: bold;
+        text-align: center;
+        clip-path: polygon(0 0, 100% 0, 100% 0%, 80% 100%, 0 100%);
+        position: relative;
+        z-index: 3;
+    
         }
+
         #navbar {
-            width: 320px;
+            width: 330px;
             background-color: #0000ff;
             margin-left: 200px;
-            margin-top: -64px;
+            margin-top: -66px;
             padding-left: 20px;
             text-align: left;
             font-size: 20px;
-            border-bottom-right-radius: 20px;
+            clip-path: polygon(0 0, 100% 0, 100% 0%, 95% 100%, 0 100%);
             position: relative;
             z-index: 1;
             color: #ffffff;
@@ -68,13 +70,42 @@ different pages have different gradient setups>
             text-decoration: none;
             margin: 0 10px;
             font-weight: bold;
+            display: inline-block;
+            transition: transform .1s ease-out;
         }
-        #content {
-            padding-left: 100px;
-            padding-top: 50px;
+
+        #navbar a:hover {
+        transform: scale(1.3);
+        }        
+
+
+        #newstitle {
+            width: 60%;
+            max-width: 800px;
+            background: rgba(102, 102, 255, 0.8);
+            padding: 2px;
+            margin: 150px auto;
+            border: solid white;
+            box-shadow: black 0px 0px 0px 2px;
+            text-align: center;
             font-size: 16px;
-    
+            border-top-left-radius: 10px;
+            border-top-right-radius: 10px;
         }
+
+        #content {
+            width: 60%;
+            max-width: 800px;
+            background: rgba(208, 208, 255, 0.8);
+            padding: 2px;
+            margin: -148px auto;
+            border: solid white;
+            box-shadow: black 0px 0px 0px 2px;
+            text-align: left;
+            font-size: 16px;
+            height: 100%;
+        }
+
         #footer {
             position:fixed;
             bottom: 0;
@@ -85,7 +116,10 @@ different pages have different gradient setups>
             font-size: 12px;
             margin-top: 20px;
         }
+
     </style>
+
+
 </head>
 <body>
     <div id="container">
@@ -93,11 +127,13 @@ different pages have different gradient setups>
         <div id="header2">Dhingy</div>
         <div id="navbar">
             <a href="index.html">Home</a> |
-            <a href="Blog.html">Entires</a>|
-            <a href="About.html">About</a>|
+            <a href="Blog.html">Entries</a> |
+            <a href="About.html">About</a> |
         </div>
+        <div id="newstitle">Test</div>
         <div id="content">
-            <p>I'm not done stop checking</p>
+            <p>* Test</p>
+            <p>^ I'm such an amazing programmer</p>
         </div>
         <div id="footer"> Copyright blah blah blah  </div>
     </div>
