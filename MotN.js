@@ -12,12 +12,12 @@ const sentences = [
 
 
 // Don't touch this
-// Function to set a random sentence
+// Function to set a random sentence and text color
 function setRandomSentence() {
-    const randomIndex = Math.floor(Math.random() * sentences.length); // Get a random index
+    const randomIndex = Math.floor(Math.random() * sentences.length); // Get a random index for sentences
     const randomSentence = sentences[randomIndex]; // Select a random sentence
     document.querySelector('#motn p').textContent = randomSentence; // Set the sentence in the <p> tag
 }
 
-// Call the function to set the random sentence when the page loads
+// Call the function to set the random sentence and color when the page loads
 window.onload = setRandomSentence;
