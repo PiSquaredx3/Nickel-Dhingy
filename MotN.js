@@ -12,19 +12,20 @@ const sentences = [
     "minecraft more like minecrap",
     "IS THAT MEGA-MINERS??",
     "Mason Troy Adams",
-    "Californication"
-    
+    "Californication",
+    "We play real rock music, like Imagine Dragons",
+    "The billionth digit of π is a 9. The first digit of π² is 9"
 ];
 
 
 
 
 // Don't touch this
-// Function to set a random sentence and text color
+// No seriously, idk how this works I stole it from another site
 function setRandomSentence() {
-    const randomIndex = Math.floor(Math.random() * sentences.length); // Get a random index for sentences
-    const randomSentence = sentences[randomIndex]; // Select a random sentence
-    document.querySelector('#motn p').textContent = randomSentence; // Set the sentence in the <p> tag
+    const randomIndex = Math.floor(Math.random() * sentences.length);
+    const randomSentence = sentences[randomIndex];
+    document.querySelector('#motn p').textContent = randomSentence;
 }
 
 // Call the function to set the random sentence and color when the page loads
