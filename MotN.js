@@ -1,17 +1,18 @@
 // Just put your MotN in this const
 const sentences = [
-    "Look Mom I CAN CODE IN JS",
+    "Look mom I can code in JavaScript",
     "Wait you actually want us to play music??",
     "Every 60 seconds, a minute passes in Africa",
     "Hi retrodev",
     "Ask me about Earthbound, please I need someone to talk to",
     "Neymar Jr. Add me on Steam, I don't care about Football I just like your csgo inventory",
-    "Bad Web Design? I'm not a spider.",
+    "Web Design? I'm not a spider.",
     "'Peter, what are you doing?' 'Crack.' 'What the-'",
     "*epic backflip*",
     "minecraft more like minecrap",
     "IS THAT MEGA-MINERS??",
-    "Mason Troy Adams"
+    "Mason Troy Adams",
+    "Californication"
     
 ];
 
