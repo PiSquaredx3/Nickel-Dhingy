@@ -30,3 +30,5 @@ function setRandomSentence() {
 
 // Call the function to set the random sentence and color when the page loads
 window.onload = setRandomSentence;
+
+
