@@ -14,7 +14,8 @@ const sentences = [
     "Mason Troy Adams",
     "Californication",
     "We play real rock music, like Imagine Dragons",
-    "The billionth digit of π is a 9. The first digit of π² is 9"
+    "The billionth digit of π is a 9. The first digit of π² is 9",
+    "Addicted to the shindig" 
 ];
 
 
