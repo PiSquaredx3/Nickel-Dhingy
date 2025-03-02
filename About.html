@@ -1,8 +1,12 @@
+<!DOCTYPE html>
+<html>
 <head>
     <title>Nickel-Dhingy</title>
 
     <style>
+        
         body {
+            background: linear-gradient(to right, #2186f1, #07519b 100%);
             font-family: Arial, Helvetica, sans-serif;
             color: #000000;
             margin: 0px;
@@ -10,61 +14,92 @@
         }
 
         #container {
-            width: 100%;
-            background-color: #ffffff;
-            padding-right: 0px;
+            width: 60%;
+            background-color: white;
+            border-width: 1px;
+            border-left: solid #c7d1e5;
+            border-right: solid #c7d1e5;
+            margin-left: 20%;
             display: flex;
-            flex-direction: row;
+            flex-direction: column;
+            align-items: center;
+            height: 100%;
+        }
+
+        .row {
+            display: flex;
+            width: 100%;
             justify-content: center;
-            flex-wrap: wrap; /* Allows wrapping of columns on smaller screens */
-            gap: 80px;
+            flex-wrap: wrap;
         }
 
         .column {
             display: flex;
             flex-direction: column;
             align-items: center;
+            width: 45%; /* Adjust width for each column */
             max-width: 560px; /* Fixed width for each column on larger screens */
-            margin-top: 50px;
+            margin-top: 60px;
             padding: 0 10px; /* Add some padding for better spacing */
             box-sizing: border-box; /* Ensures padding doesn’t affect width */
         }
 
+        .full-width {
+            width: 90%; /* Full width for the second row */
+            max-width: 1120px; /* Double the max-width of a single column */
+        }
+
         .column div {
-            width: 100%; /* Makes sure all child divs fill the column */
+            width: 90%; /* Makes sure all child divs fill the column */
             box-sizing: border-box; /* Ensures padding doesn’t affect width */
         }
 
         #header {
-            background-color: #0f6bc0;
+            margin: 100px;
+            margin-left: 20%;
+            width: 60%;
+            background-color: #0000ff;
+            border: solid #0000aa;
+            border-width: 3px;
             color: white;
             padding: 0px;
             height: 50px;
             font-size: 32px;
             font-weight: bold;
             text-align: left;
-            padding-left: 20px;
             position: relative;
+            text-indent: 10px;
             z-index: 4;
             line-height: 50px;
-            border-bottom: black 2px solid;
+            border-top-left-radius: 10px;
+            border-top-right-radius: 10px;
         }
 
-        
-
-        #navbar {
-            height: 45px;
-            margin-left: 300px;
-            margin-top: -43px;
-            text-align: left;
-            font-size: 20px;
-            position: relative;
-            z-index: 4;
+        #navbar, #navbar2, #navbar3 {
+            background: linear-gradient(to right, #6699ce, #bcdeff 100%);
+            text-align: center;
+            font-size: 32px;
+            position: absolute;
+            margin-top: -45px;
+            left: 50%;
+            width: 7%;
+            border: solid #4581c0;;
+            border-radius: 10px;
+            border-width: 2px;
+            z-index: 2;
             color: #ffffff;
-            line-height: 55px;
+            line-height: 50px;
         }
 
-        #navbar a {
+        #navbar2 {
+            left: 57.5%;
+        }
+
+        #navbar3 {
+            left: 65%;
+        }
+
+        #navbar a, #navbar2 a, #navbar3 a {
             color: rgb(255, 255, 255);
             text-decoration: none;
             margin: 0 10px;
@@ -73,39 +108,45 @@
             transition: transform .1s ease-out, opacity .1s ease-out;
         }
 
-        #navbar:hover a {
-            opacity: 0.7;
+        #navbar a:hover, #navbar2 a:hover, #navbar3 a:hover {
+            text-decoration: underline;
         }
 
-        #navbar a:hover {
-            text-decoration: underline;
-            opacity: 1;
-        }
+        
+
+        
 
         #motn {
+            margin-top: -100px;
+            margin-left: 20%;
+            width: 60%;
             font-family: "Comic Sans MS", "Comic Sans";
             background-color: #c7d1e5;
-            margin-top:-20px;
-            padding-left: 2px;
-            text-align: left;
+            text-align: center;
             font-size: 15px;
             position: relative;
             z-index: 1;
             color: #0000ff;
-            height: 30px;
-            line-height: 30px;
+            line-height: 0px;
+            height: 25px;
+            border: solid #c7d1e5;
+            border-width: 3px;
         }
 
+
         #footer {
-            position: fixed;
-            bottom: 0;
-            width: 100%;
-            background: rgba(255, 255, 255, 0);
-            padding: 20px;
-            text-align: left;
+            width: 60%;
+            margin-left: 20%;
+            text-align: center;
             font-size: 12px;
-            margin-top: 20px;
-            background: linear-gradient(to top, #0f6bc0, #ffffff 110%);
+            color: black;
+            padding-top: 10px;
+            padding-bottom: 10px;
+            background-color: white;
+            border-left: solid #c7d1e5;
+            border-right: solid #c7d1e5;
+            border-width: 3px;
+            position: relative;
         }
 
         @media (max-width: 600px) {
@@ -131,55 +172,33 @@
 
             #motn {
                 font-size: 16px;
-                margin-left: 0;
-                padding-left: 10px;
+                margin-top: 60px;
             }
 
-            #newstitle, #sutitle, #thingofthenowheader {
-                font-size: 24px;
-            }
-
-            #newscontent, #sucontent, #thingofthenow {
-                font-size: 14px;
-            }
-
-            iframe {
-                height: 200px;
-            }
-        }
-
-        media (min-width: 768px) {
-            .column {
-                width: 30%; /* Adjust width for larger screens */
-            }
-        }
-
-        @media (min-width: 1024px) {
-            .column {
-                width: 25%; /* Adjust width for larger screens */
+            #footer {
+                font-size: 10px;
+                padding: 10px;
             }
         }
     </style>
 </head>
-       
-
-
-
 <body>
 
-    <div id="header">Nickel Dhingy
-        <div id="navbar">
-            |<a href="index.html">Home</a>| 
-            <a href="Blog.html">Blog<img src="https://icons.iconarchive.com/icons/virtuallnk/web/16/RSS-icon.png" width="15"></a>|
-            <a href="About.html">About</a>|
-        </div>
-    </div> 
-    
+    <div id="navbar">
+        <a href="index.html">Home</a> 
+        
+    </div>
+    <div id="navbar2">
+        <a href="Blog.html">Blog<img src="https://icons.iconarchive.com/icons/virtuallnk/web/16/RSS-icon.png" width="17"></a>
+        
+    </div>
+    <div id="navbar3"><a href="About.html">About</a></div>
 
+    <div id="header">Nickel Dhingy</div> 
+    
     <div id="motn"> <p></p> </div>
     <script src="MotN.js"></script>
-
-        <h1>not yet</h1>
-
-        <div id="footer">This Site is best experienced on PC/Mac, I hate making html work on phones...</div>
+    
+    <div id="footer"> This Site is best experienced on PC/Mac at Full-Screen, I hate making html work on phones... </div>
+</body>
 </html>
