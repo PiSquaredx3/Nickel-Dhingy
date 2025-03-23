@@ -167,6 +167,31 @@
             padding: 12px;
         }
 
+       #blogheader {
+            width: 100%;
+            background: linear-gradient(to top, #9e9e9e, #e2e2e2 100%);
+            text-indent: 15px;
+            border: solid #616368 1px;
+            text-align: left;
+            font-size: 24px;
+            border-top-left-radius: 2px;
+            border-top-right-radius: 2px;
+        }
+
+        #blog {
+            margin-top: -1px;
+            width: 100%;
+            background: #cacaca;
+            padding: 2px;
+            border: solid #616368 1px;
+            text-align: left;
+            font-size: 16px;
+            text-indent: 15px;
+            border-bottom-left-radius: 2px;
+            border-bottom-right-radius: 2px;
+            margin-bottom: 30px;
+        }
+
         #footer {
             width: 60%;
             margin-left: 20%;
