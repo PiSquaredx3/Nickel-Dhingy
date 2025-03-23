@@ -43,5 +43,3 @@ title: Nickel-Dhingy
             </div>
         </div>
     </div>
-    
-    <div id="footer"> Hi, you probably found me by accident, well, did you know I don't actually know how to program and this was all done by my cat. </div>
