@@ -7,7 +7,6 @@ const sentences = [
     "Ask me about Earthbound, please I need someone to talk to",
     "Neymar Jr. Add me on Steam, I don't care about Football I just like your csgo inventory",
     "Web Design? I'm not a spider.",
-    "'Peter, what are you doing?' 'Crack.' 'What the-'",
     "*epic backflip*",
     "minecraft more like minecrap",
     "IS THAT MEGA-MINERS??",
@@ -15,7 +14,8 @@ const sentences = [
     "Californication",
     "We play real rock music, like Imagine Dragons",
     "The billionth digit of π is a 9. The first digit of π² is 9",
-    "Addicted to the shindig" 
+    "Did I over-design the site? This is a legit question email if you think so, give me ideas of what to fix.",
+    "Unlucky Roll, try again"
 ];
 
 
