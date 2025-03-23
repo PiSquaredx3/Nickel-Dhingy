@@ -1,1 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ page.title }}</title>
+    <link rel="stylesheet" href="{{ '/assets/style.css' | relative_url }}">
+</head>
+<body>
 
+    <div id="header">
+        Nickel-Dhingy
+        <div id="navbar">
+            <a href="{{ '/' | relative_url }}">Home</a> 
+        </div>
+        <div id="navbar2">
+            <a href="{{ '/blog/' | relative_url }}">Blog</a>
+        </div>
+        <div id="navbar3">
+            <a href="{{ '/about/' | relative_url }}">About</a>
+        </div>
+    </div> 
+
+    <div id="motn"> <p></p> </div>
+    <script src="{{ '/MotN.js' | relative_url }}"></script>
+
+    <div id="container">
+        {{ content }}
+    </div>
+
+    <div id="footer">
+        Hi, you probably found me by accident. Did you know I don't actually know how to program and this was all done by my cat?
+    </div>
+
+</body>
+</html>
