@@ -3,7 +3,6 @@ layout: default
 title: Nickel-Dhingy
 ---
 
-<div id="container">
     <div class="row">
         <div class="column">
             <div id="newstitle">News</div>
