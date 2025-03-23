@@ -3,18 +3,7 @@ layout: default
 title: Nickel-Dhingy
 ---
 
-<div id="header">Nickel-Dhingy <div id="navbar">
-        <a href="index.html">Home</a> 
-    </div>
-    <div id="navbar2">
-        <a href="Blog.html">Blog</a>
-    </div>
-    <div id="navbar3"><a href="About.html">About</a></div></div> 
-    
-    <div id="motn"> <p></p> </div>
-    <script src="MotN.js"></script>
-
-    <div id="container">
+<div id="container">
         <div class="row">
             <div class="column">
                 <div id="newstitle">News</div>
