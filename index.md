@@ -3,25 +3,6 @@ layout: default
 title: Nickel-Dhingy
 ---
 
-<div id="header">
-    Nickel-Dhingy
-    <div id="navbar">
-        <a href="{{ '/' | relative_url }}">Home</a>
-    </div>
-    <div id="navbar2">
-        <a href="{{ '/blog/' | relative_url }}">Blog</a>
-    </div>
-    <div id="navbar3">
-        <a href="{{ '/about/' | relative_url }}">About</a>
-    </div>
-</div>
-
-<div id="motn">
-    <p></p>
-</div>
-
-<script src="{{ '/MotN.js' | relative_url }}"></script>
-
 <div id="container">
     <div class="row">
         <div class="column">
@@ -49,8 +30,4 @@ title: Nickel-Dhingy
             </div>
         </div>
     </div>
-</div>
-
-<div id="footer">
-    Hi, you probably found me by accident. Did you know I don't actually know how to program and this was all done by my cat?
 </div>
