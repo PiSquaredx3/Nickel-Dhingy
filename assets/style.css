@@ -9,6 +9,12 @@
             padding: 0px;
         }
 
+ #dog {
+        position: relative;
+        right: 45%;
+        cursor: pointer;
+        }
+
         #container {
             font-family: sans-serif;
             margin-left: 10%;
