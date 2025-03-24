@@ -43,8 +43,6 @@
             box-sizing: border-box; /* Ensures padding doesn’t affect width */
         }
 
-        
-
         #header {
         font: Helvetica;
         margin: 40px;
@@ -67,18 +65,17 @@
         
 
  #navbar, #navbar2, #navbar3 {
-            border-radius: 10px;
-            background: linear-gradient(to bottom, #505050, #343434);
-            text-align: left;
+            background: transparent;
             text-indent: 0px;
             font-size: 32px;
             z-index: 10;
             color: #ffffff;
             line-height: 50px;
             min-width: 100px;
-            display: inline-block;
             position: relative;
+            
         }
+
 
 
         #navbar a, #navbar2 a, #navbar3 a {
@@ -92,7 +89,8 @@
 
 
         #navbar:hover, #navbar2:hover, #navbar3:hover {
-            background: linear-gradient(to bottom, #666666, #343434);
+            border-radius: 10px;
+            background: linear-gradient(to bottom, #666666, transparent);
         }
 
         #motn {
@@ -112,7 +110,7 @@
             height: 25px;
             border-bottom-right-radius: 10px;
             border-bottom-left-radius: 10px;
-            box-shadow: 0px 5px 10px -1px;
+           box-shadow: 0px 5px 10px -1px;
         }
 
         #newstitle, #sutitle, #thingofthenowheader {
@@ -148,7 +146,7 @@
             width: 100%;
             background: linear-gradient(to top, #9e9e9e, #e2e2e2 100%);
             text-indent: 15px;
-            border: solid #616368 1px;
+            border: solid transparent 1px;
             text-align: left;
             font-size: 24px;
             border-top-left-radius: 10px;
@@ -158,9 +156,9 @@
         #blog {
             margin-top: -1px;
             width: 100%;
-            background: #cacaca;
+            background: #ffffff;
             padding: 2px;
-            border: solid #616368 1px;
+            border: solid transparent 1px;
             text-align: left;
             font-size: 16px;
             text-indent: 15px;
