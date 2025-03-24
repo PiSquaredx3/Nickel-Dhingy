@@ -43,6 +43,8 @@
             box-sizing: border-box; /* Ensures padding doesn’t affect width */
         }
 
+        
+
         #header {
         font: Helvetica;
         margin: 40px;
@@ -65,19 +67,19 @@
         
 
  #navbar, #navbar2, #navbar3 {
+            border-radius: 10px;
             background: linear-gradient(to bottom, #505050, #343434);
             text-align: left;
             text-indent: 0px;
             font-size: 32px;
-            
             z-index: 10;
             color: #ffffff;
             line-height: 50px;
             min-width: 100px;
             display: inline-block;
             position: relative;
-            
         }
+
 
         #navbar a, #navbar2 a, #navbar3 a {
             color: rgb(255, 255, 255);
@@ -110,7 +112,7 @@
             height: 25px;
             border-bottom-right-radius: 10px;
             border-bottom-left-radius: 10px;
-           box-shadow: 0px 5px 10px -1px;
+            box-shadow: 0px 5px 10px -1px;
         }
 
         #newstitle, #sutitle, #thingofthenowheader {
