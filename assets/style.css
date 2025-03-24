@@ -162,6 +162,10 @@
             border-bottom-right-radius: 2px;
         }
 
+       #subcontent {
+              margin-bottom: 30px;
+       }
+
         #thingofthenow {
             text-indent: 0px;
             padding: 12px;
