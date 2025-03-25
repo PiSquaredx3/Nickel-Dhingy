@@ -64,6 +64,7 @@
         max-width: 1200px; 
         line-height: 50px;
         z-index: 9;
+            box-shadow: 0px 5px 10px -1px;
         }   
 
         
@@ -125,6 +126,7 @@
             font-size: 24px;
             border-top-left-radius: 10px;
             border-top-right-radius: 10px;
+            box-shadow: 0px 5px 10px -1px;
         }
 
         #newscontent, #sucontent, #thingofthenow {
@@ -138,6 +140,7 @@
             text-indent: 15px;
             border-bottom-left-radius: 10px;
             border-bottom-right-radius: 10px;
+            box-shadow: 0px 5px 10px -1px;
         }
 
 
@@ -240,6 +243,7 @@
      
      #title{
          font-size: 20px;
+         margin-left: -10%;
      }
             #header {
                 font-size: 24px;
@@ -261,6 +265,7 @@
             #motn {
                 font-size: 16px;
                 margin-left: 10%;
+                margin-top: -16px;
                 width: 80%;
             }
 
