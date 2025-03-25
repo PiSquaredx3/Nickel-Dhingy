@@ -18,12 +18,6 @@
 }
 
 
-        #dog {
-        position: relative;
-        right: 45%;
-        cursor: pointer;
-        }
-
 
         .row {
             display: flex;
