@@ -90,7 +90,7 @@
 
 
         #navbar a, #navbar2 a, #navbar3 a {
-            color: rgb(255, 255, 255);
+            color: darkslategrey;
             text-decoration: none;
             margin: 0 10px;
             font-weight: bold;
@@ -100,7 +100,7 @@
 
 
         #navbar:hover, #navbar2:hover, #navbar3:hover {
-            background: linear-gradient(to bottom, #fffffff, trasparent);
+            background: linear-gradient(to bottom, transparent, white, transparent);
         }
 
         #motn {
@@ -224,15 +224,11 @@
         height: 50px;
     }
     
-    .navbar-container {
-        flex-direction: column;
-        align-items: center;
-    }
     
     .navbar {
         font-size: 18px;
         flex-direction: column;
-        gap: 5px;
+        gap: 50px;
         width: 100%;
     }
     
@@ -260,7 +256,7 @@
 
             #navbar, #navbar2, #navbar3 {
                 font-size: 16px;
-                margin-left: -10%;
+                margin-left: -5%;
                 margin-top: 0;
                 line-height: 40px;
                 width: 80px;
