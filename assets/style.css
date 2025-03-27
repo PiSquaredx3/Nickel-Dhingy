@@ -129,7 +129,7 @@
             color: #ffffff;
         }
 
-        #newscontent, #sucontent, #thingofthenow {
+        #newscontent, #sucontent, #thingofthenow, #blog {
             margin-top: 10px;
             width: 100%;
             background: #ffffff;
@@ -148,19 +148,7 @@
             padding: 12px;
         }
 
-        #blog {
-            margin-top: 10px;
-            width: 100%;
-            background: #cacaca;
-            padding: 2px;
-            border: solid transparent 1px;
-            text-align: left;
-            font-size: 16px;
-            text-indent: 15px;
-            border-radius: 5px;
-            margin-bottom: 30px;
-            box-shadow: 0px 5px 10px -1px;
-        }
+     
 
 
 
