@@ -117,7 +117,7 @@
             
         }
 
-        #newstitle, #sutitle, #thingofthenowheader {
+        #newstitle, #sutitle, #thingofthenowheader, #blogheader {
             width: 100%;
             background: linear-gradient(to bottom, #eceeef 1%, #b8bcc0 47%, #858a8f 50%, #b8bcc0 100%);
             text-indent: 15px;
@@ -148,20 +148,8 @@
             padding: 12px;
         }
 
-       #blogheader {
-            width: 100%;
-           background: linear-gradient(to bottom, #eceeef 1%, #b8bcc0 47%, #858a8f 50%, #b8bcc0 100%);
-            text-indent: 15px;
-            border: solid transparent 1px;
-            text-align: left;
-            font-size: 24px;
-            border-top-left-radius: 5px;
-            border-top-right-radius: 5px;
-            box-shadow: 0px 5px 10px -1px;
-        }
-
         #blog {
-            margin-top: -1px;
+            margin-top: 10px;
             width: 100%;
             background: #cacaca;
             padding: 2px;
@@ -169,8 +157,7 @@
             text-align: left;
             font-size: 16px;
             text-indent: 15px;
-            border-bottom-left-radius: 5px;
-            border-bottom-right-radius: 5px;
+            border-radius: 5px;
             margin-bottom: 30px;
             box-shadow: 0px 5px 10px -1px;
         }
