@@ -95,7 +95,7 @@
 }
 
 
-        #navbar a, #navbar2 a, #navbar3 a {
+        #navbar a {
             color: white;
             text-decoration: none;
             margin: 0 10px;
@@ -105,7 +105,7 @@
         }
 
 
-        #navbar:hover, #navbar2:hover, #navbar3:hover {
+        #navbar:hover {
             color: darkslategray;
              transform: scale(1.3);
             transition: transform 0.12s ease;
