@@ -78,20 +78,21 @@
 
         
 
-         #navbar, #navbar2, #navbar3 {
-            font-family: Copperplate, Papyrus, fantasy;
-            border-radius: 10px;
-            background: transparent;
-            text-align: center;
-            text-indent: 0;
-            font: 20px sans;
-            z-index: 10;
-            color: black;
-            line-height: 40px;
-            min-width: 100px;
-            display: inline-block;
-            position: relative;
-        }
+        #navbar {
+    font-family: Copperplate, Papyrus, fantasy;
+    border-radius: 10px;
+    background: transparent;
+    text-align: center;
+    text-indent: 0;
+    font: 20px sans;
+    z-index: 10;
+    color: black;
+    line-height: 40px;
+    min-width: 100px;
+    display: inline-block;
+    position: relative;
+    margin-right: 10px; /* moves next button slightly left */
+}
 
 
         #navbar a, #navbar2 a, #navbar3 a {
