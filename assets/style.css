@@ -61,14 +61,14 @@
         
         margin-left: 20%;
         width: 60%;
-        background: linear-gradient(to bottom, #c5c7c9 1%, #8f9498 43%, #5e6368 45%, #8f9498 100%);
+        background: linear-gradient(to bottom, #999999 49%, #808080 50%, #d6d6d6 100%);
 
         color: black;
         height: 40px;
         text-align: center;
         text-indent: 10px;
-        border-radius: 5px;
-        
+        border-radius: 20px;
+        border: white solid 2px;
         display: flex;
         max-width: 1200px; 
         line-height: 50px;
@@ -78,7 +78,7 @@
 
         
 
-        #navbar {
+         #navbar {
     font-family: Copperplate, Papyrus, fantasy;
     border-radius: 10px;
     background: transparent;
@@ -95,8 +95,9 @@
 }
 
 
+
         #navbar a {
-            color: white;
+            color: black;
             text-decoration: none;
             margin: 0 10px;
             font-weight: bold;
@@ -105,7 +106,7 @@
         }
 
 
-        #navbar:hover {
+        #navbar:hover{
             color: darkslategray;
              transform: scale(1.3);
             transition: transform 0.12s ease;
@@ -131,26 +132,29 @@
 
         #newstitle, #sutitle, #thingofthenowheader, #blogheader {
             width: 100%;
-            background: linear-gradient(to bottom, #c5c7c9 1%, #8f9498 43%, #5e6368 45%, #8f9498 100%);            text-indent: 15px;
-            
+            background: linear-gradient(to bottom, #6699cc 49%, #507aa3 50%, #a3c2f0 100%);            
+            text-indent: 15px;
             font-size: 24px;
-            border-radius: 5px;
-           
+            border: solid white 2px;
+            border-top-left-radius: 20px;
+            border-top-right-radius: 20px;
             box-shadow: black 0px 5px 10px -1px;
             color: #ffffff;
         }
 
         #newscontent, #sucontent, #thingofthenow, #blog {
-            margin-top: 10px;
+            margin-top: -2px;
             width: 100%;
-            background: #ffffff;
+            background: darkgray;
             padding: 2px;
-            border: solid transparent 1px;
+            border: solid white 2px;
             text-align: left;
             font-size: 16px;
             text-indent: 15px;
-            border-radius: 5px;
-            box-shadow: 0px 5px 10px -1px;
+            border-bottom-left-radius: 20px;
+            border-bottom-right-radius: 20px;
+            color: whitesmoke;
+            box-shadow: black 0px 5px 10px -1px;
         }
 
 
