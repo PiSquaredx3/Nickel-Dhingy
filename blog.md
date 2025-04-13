@@ -12,7 +12,7 @@ title: Nickel-Dhingy
             <div class="column">
                 <div id="blogheader">Blog</div>
                 <div id="blog">
-                    <p>uh </p>
+    
                 </div>
             </div>
         </div>
