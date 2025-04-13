@@ -1,1 +1,11 @@
-
+// test.json
+[
+  {
+    "title": "Test Posts",
+    "content": "This is the content of the first post."
+  },
+  {
+    "title": "test2",
+    "content": "This is testing another thing"
+  }
+]
