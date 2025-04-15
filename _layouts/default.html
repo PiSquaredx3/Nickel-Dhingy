@@ -6,17 +6,25 @@
     <title>{{ page.title }}</title>
     <link rel="stylesheet" href="{{ '/assets/style.css' | relative_url }}">
     <style>
-        .raindrop {
+        .snowflake {
             position: absolute;
-            width: 2px;
-            height: 20px;
-            background: rgba(255, 255, 255, 0.6);
+            top: -10px;
+            width: 6px;
+            height: 6px;
+            background: white;
+            border-radius: 50%;
+            opacity: 0.8;
             animation: fall linear infinite;
         }
 
         @keyframes fall {
-            to {
+            0% {
+                transform: translateY(0);
+                opacity: 0.8;
+            }
+            100% {
                 transform: translateY(100vh);
+                opacity: 0.2;
             }
         }
     </style>
@@ -45,12 +53,12 @@
 
     <script>
         for (let i = 0; i < 100; i++) {
-            const drop = document.createElement('div');
-            drop.classList.add('raindrop');
-            drop.style.left = Math.random() * 100 + 'vw';
-            drop.style.animationDuration = 0.5 + Math.random() * 0.5 + 's';
-            drop.style.animationDelay = Math.random() * 2 + 's';
-            document.body.appendChild(drop);
+            const flake = document.createElement('div');
+            flake.classList.add('snowflake');
+            flake.style.left = Math.random() * 100 + 'vw';
+            flake.style.animationDuration = (5 + Math.random() * 5) + 's';
+            flake.style.animationDelay = Math.random() * 5 + 's';
+            document.body.appendChild(flake);
         }
     </script>
 
