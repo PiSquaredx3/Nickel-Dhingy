@@ -54,13 +54,14 @@
     <script>
         
         for (let i = 0; i < 100; i++) {
-            const flake = document.createElement('div');
-            flake.classList.add('snowflake');
-            flake.style.left = Math.random() * 1000 + 'vw';
-            flake.style.animationDuration = (1 + Math.random() * 5) + 's';
-            flake.style.animationDelay = Math.random() * 10 + 's';
-            document.body.appendChild(flake);
-        }
+            for (let i = 0; i < 100; i++) {
+        const flake = document.createElement('div');
+        flake.classList.add('snowflake');
+        flake.style.left = Math.random() * 100 + 'vw'; // ensures no overflow
+        flake.style.animationDuration = (5 + Math.random() * 5) + 's';
+        flake.style.animationDelay = Math.random() * 5 + 's';
+        container.appendChild(flake);
+    }
     
     </script>
 
