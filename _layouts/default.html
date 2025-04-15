@@ -6,11 +6,22 @@
     <title>{{ page.title }}</title>
     <link rel="stylesheet" href="{{ '/assets/style.css' | relative_url }}">
     <style>
+        #snow-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw; /* match screen width */
+    max-width: 100vw;
+    height: 100vh;
+    z-index: -1;
+    pointer-events: none;
+    overflow: hidden;
+}
         .snowflake {
             position: absolute;
             top: 0px;
-            width: 2px;
-            height: 2px;
+            width: 5px;
+            height: 5px;
             background: whitesmoke;
             border-radius: 30%;
             opacity: 1;
@@ -52,9 +63,8 @@
     </div>
 
     <script>
-        
-        for (let i = 0; i < 100; i++) {
-            for (let i = 0; i < 100; i++) {
+    const container = document.getElementById('snow-container');
+    for (let i = 0; i < 100; i++) {
         const flake = document.createElement('div');
         flake.classList.add('snowflake');
         flake.style.left = Math.random() * 100 + 'vw'; // ensures no overflow
@@ -62,8 +72,8 @@
         flake.style.animationDelay = Math.random() * 5 + 's';
         container.appendChild(flake);
     }
-    
-    </script>
+</script>
+
 
 </body>
 </html>
