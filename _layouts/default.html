@@ -5,14 +5,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ page.title }}</title>
     <link rel="stylesheet" href="{{ '/assets/style.css' | relative_url }}">
+    <style>
+        .raindrop {
+            position: absolute;
+            width: 2px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.6);
+            animation: fall linear infinite;
+        }
+
+        @keyframes fall {
+            to {
+                transform: translateY(100vh);
+            }
+        }
+    </style>
 </head>
 <body>
 
     <div id="title"><a href="/">Nickel-Dhingy</a></div>
 
-    
     <div id="header">
-        
         <div id="navbar">
             <a href="/blog/">Blog</a>
         </div>
@@ -30,10 +43,16 @@
         Hi, you probably found me by accident. Did you know I don't actually know how to program and this was all done by my cat?
     </div>
 
+    <script>
+        for (let i = 0; i < 100; i++) {
+            const drop = document.createElement('div');
+            drop.classList.add('raindrop');
+            drop.style.left = Math.random() * 100 + 'vw';
+            drop.style.animationDuration = 0.5 + Math.random() * 0.5 + 's';
+            drop.style.animationDelay = Math.random() * 2 + 's';
+            document.body.appendChild(drop);
+        }
+    </script>
+
 </body>
-
-
-
-
-    
 </html>
