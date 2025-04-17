@@ -1,80 +1,120 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Nickel-Dhingy</title>
-  <link rel="stylesheet" href="{{ '/assets/style.css' | relative_url }}">
-  <!-- Include the marked.js library for parsing Markdown -->
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ page.title }}</title>
+    <link rel="stylesheet" href="{{ '/assets/style.css' | relative_url }}">
+    <style>
+        body {
+            margin: 0;
+            overflow-x: hidden;
+        }
+
+        #snow-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            max-width: 100vw;
+            height: 100vh;
+            z-index: -1;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        .snowflake {
+            position: absolute;
+            top: 0px;
+            width: 5px;
+            height: 5px;
+            background: whitesmoke;
+            border-radius: 30%;
+            opacity: 1;
+            animation: fall linear infinite;
+        }
+
+        
+        body {
+            margin: 0;
+            overflow-x: hidden;
+        }
+
+        #snow-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            max-width: 100vw;
+            height: 100vh;
+            z-index: -1;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        .snowflake {
+            position: absolute;
+            top: 0px;
+            width: 5px;
+            height: 5px;
+            background: whitesmoke;
+            border-radius: 30%;
+            opacity: 1;
+            animation: fall linear infinite;
+        }
+
+        @keyframes fall {
+            0% {
+                transform: translateY(0);
+                opacity: 0;
+            }
+10% {
+opacity: 1;
+}
+
+            100% {
+                transform: translateY(100vh);
+                opacity: 0.3;
+            }
+        }
+    
+    </style>
 </head>
 <body>
-  <div id="snow-container"></div>
 
-  <!-- Title as Home button -->
-  <div id="title" onclick="navigate('index')">
-    <a href="/">Nickel-Dhingy</a>
-  </div>
+    <div id="snow-container"></div>
 
-  <div id="header">
-    <div id="navbar">
-      <a href="javascript:void(0)" onclick="navigate('blog')">Blog</a>
-      <a href="javascript:void(0)" onclick="navigate('about')">About</a>
+    <div id="title"><a href="/">Nickel-Dhingy</a></div>
+
+    <div id="header">
+        <div id="navbar">
+            <a href="/blog/">Blog</a>
+        </div>
+        <div id="navbar">
+            <a href="/about/">About</a>
+        </div>
     </div>
-  </div>
 
-  <div id="motn"><p></p></div>
-  <script src="{{ '/MotN.js' | relative_url }}"></script>
+    <div id="motn"> <p></p> </div>
+    <script src="{{ '/MotN.js' | relative_url }}"></script>
 
-  <div id="content-container">
-    <!-- Content will be dynamically loaded here -->
-  </div>
+    {{ content }}
 
-  <div id="footer">
-    Hi, you probably found me by accident. Did you know I don't actually know how to program and this was all done by my cat?
-  </div>
+    <div id="footer">
+        Hi, you probably found me by accident. Did you know I don't actually know how to program and this was all done by my cat?
+    </div>
 
-  <script>
-    // Snow effect
-    const container = document.getElementById('snow-container');
-    for (let i = 0; i < 100; i++) {
-      const flake = document.createElement('div');
-      flake.classList.add('snowflake');
-      flake.style.left = Math.random() * 100 + 'vw';
-      flake.style.animationDuration = (5 + Math.random() * 5) + 's';
-      flake.style.animationDelay = Math.random() * 5 + 's';
-      container.appendChild(flake);
-    }
+    <script>
+        const container = document.getElementById('snow-container');
+        for (let i = 0; i < 100; i++) {
+            const flake = document.createElement('div');
+            flake.classList.add('snowflake');
+            flake.style.left = Math.random() * 100 + 'vw';
+            flake.style.animationDuration = (5 + Math.random() * 5) + 's';
+            flake.style.animationDelay = Math.random() * 5 + 's';
+            container.appendChild(flake);
+        }
+    </script>
 
-    // Function to fetch and display markdown content
-    function loadMarkdown(page) {
-      console.log(`Loading ${page}.md...`);
-      fetch(`${page}.md`)
-        .then(response => {
-          if (!response.ok) {
-            throw new Error(`Failed to load ${page}.md`);
-          }
-          return response.text();
-        })
-        .then(markdown => {
-          // Convert markdown to HTML
-          const htmlContent = marked(markdown);
-          document.getElementById('content-container').innerHTML = htmlContent;
-        })
-        .catch(error => {
-          console.error(error);
-          document.getElementById('content-container').innerHTML = `<p>Sorry, we couldn't load the ${page} page. Please try again later.</p>`;
-        });
-    }
-
-    // Function to handle page navigation
-    function navigate(page) {
-      console.log(`Navigating to ${page}`);
-      loadMarkdown(page);
-    }
-
-    // Default to home page (index.md)
-    navigate('index');
-  </script>
 </body>
 </html>
