@@ -19,10 +19,14 @@ title: Nickel-Dhingy
     
         <div class="row">
             <div class="column">
-                <div id="newstitle">Desktop Brayden</div>
-                <div id="newscontent">
-                    <img src="assets/pictures/Screenshot_20250425_185554.png" alt="Desktop Brayden" width="300">
-                </div>
+                <div id="thingofthenowheader">Desktop Brayden</div>
+                <div id="thingofthenow">
+                    <img src="/assets/pictures/thumbnail.png" alt="Desktop Brayden" width="90%">
+<p>This is the Brayden Desktop Buddy, He's an asshole.</p>
+<p>Brayden will waste you're time showing you random images from his phone and changing your current web browser tab random
+                </p></div>
+
+
             </div>
         </div>
     </div>
