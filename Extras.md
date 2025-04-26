@@ -23,7 +23,7 @@ title: Nickel-Dhingy
                 <div id="thingofthenow">
                     <img src="/assets/pictures/thumbnail.png" alt="Desktop Brayden" width="90%">
 <p>This is the Brayden Desktop Buddy, He's an asshole.</p>
-<p>Brayden will waste you're time showing you random images from his phone and changing your current web browser tab random</p>
+<p>Brayden will waste you're time showing you random images from his phone and changing your current web browser tab to a random site</p>
 <a href="/braydendesktop/DesktopBrayden_DevBuild1.zip" download> Download the latest version. You've been warned. </a>
 </div>
 
