@@ -21,7 +21,7 @@ title: Nickel-Dhingy
             <div class="column">
                 <div id="newstitle">Desktop Brayden</div>
                 <div id="newscontent">
-    
+                    <img src="assets/pictures/Screenshot_20250425_185554.png" alt="Desktop Brayden" width="300">
                 </div>
             </div>
         </div>
