@@ -1,0 +1,308 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body, html {
+  height: 100%;
+  font-family: 'Chicago', 'Geneva', sans-serif;
+  overflow: hidden;
+  background-color: #31427b; /* NickelDhingyOS blue */
+  user-select: none;
+}
+
+
+#boot-screen {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw; height: 100vh;
+  background-color: #31427b;
+  color: white;
+  font-family: monospace;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.boot-text {
+  margin-bottom: 20px;
+  font-size: 1.2em;
+}
+
+.boot-bar {
+  width: 60%;
+  height: 20px;
+  background-color: #b0b0b0;
+  border: 1px solid #000055;
+  overflow: hidden;
+}
+
+.boot-progress {
+  height: 18px;
+  width: 0%;
+  background-image: linear-gradient(
+    to bottom,
+    #8b8bc5 0px,
+    #9999cc 1px,
+    #6c6cb5 2px,
+    #8282c1 3px,
+    #9999cc 4px,
+    #b0b0d7 5px,
+    #c6c6e3 6px,
+    #ddddee 7px,
+    #f4f4f9 8px,
+    #f1f1f6 9px,
+    #d4d4e3 10px,
+    #b8b8d0 11px,
+    #9c9cbd 12px,
+    #7f7faa 13px,
+    #636397 14px,
+    #474784 15px,
+    #11112d 16px,
+    #060626 17px
+  );
+  background-size: 100% 18px;
+  background-repeat: no-repeat;
+  transition: width 7s steps(80);
+}
+
+
+
+#menubar {
+  background: #c0c0c0;
+  height: 28px; /* increased height */
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  font-size: 14px; /* slightly larger font */
+  font-weight: bold;
+  border-bottom: 2px solid #202c52; /* thicker bottom border */
+  box-shadow: 0 1px 0 #fff inset; /* slight top highlight for depth */
+  cursor: default;
+}
+
+.menu-item {
+  margin-right: 16px;
+  padding: 0px 6px;
+  border-radius: 2px;
+  object-fit: contain;
+}
+
+.menu-item:hover {
+  background: #a0a0a0;
+}
+
+
+.menu-right {
+  margin-left: auto;
+}
+
+#desktop {
+  display: flex;
+  gap: 40px;            /* increase horizontal spacing between icons */
+  padding: 20px;
+  justify-content: flex-end; /* align icons to the right */
+  /* optionally, keep vertical centering */
+  align-items: center; 
+}
+
+
+.desktop-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 64px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.desktop-icon img {
+  width: 32px;
+  height: 32px;
+}
+
+.desktop-icon span {
+  margin-top: 4px;
+  font-size: 12px;
+  text-align: center;
+  color: white;
+  text-shadow: 1px 1px 2px black;
+}
+
+.window {
+  position: absolute;
+  top: 400px;
+  left: 600px;
+  width: 800px;
+  height: 600px;
+  background: #c0c0c0; /* Classic light gray */
+  border-top: 2px solid #fff;      /* Highlight */
+  border-left: 2px solid #fff;     /* Highlight */
+  border-bottom: 2px solid #404040; /* Shadow */
+  border-right: 2px solid #404040;  /* Shadow */
+  box-shadow:
+    inset 1px 1px 0 #fff,         /* Inner highlight */
+    inset -1px -1px 0 #404040;    /* Inner shadow */
+  display: flex;
+  flex-direction: column;
+  font-family: "Chicago", "Geneva", sans-serif; /* Classic Mac font */
+  color: black;
+  user-select: none;
+  /* Add subtle outer shadow for slight depth */
+  filter: drop-shadow(3px 3px 3px rgba(0,0,0,0.25));
+}
+
+.window-header {
+  position: relative;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center; /* Center contents */
+  padding: 0 10px;
+  background: linear-gradient(to bottom, #e0e0e0, #b0b0b0);
+  border-bottom: 2px solid #404040;
+  font-weight: bold;
+  font-size: 13px;
+  color: #000;
+  text-shadow: 1px 1px 0 #fff;
+  border-top: 1px solid #fff;
+  border-left: 1px solid #fff;
+  border-bottom: 1px solid #404040;
+  border-right: 1px solid #404040;
+}
+
+.window-title {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.close-btn {
+  margin-left: -100%;
+  width: 20px;
+  height: 20px;
+  background: linear-gradient(to bottom, #c0c0c0, #808080);
+  border: 2px solid #404040;
+  box-shadow: inset 1px 1px 0 #fff, inset -1px -1px 0 #404040;
+  color: black;
+  font-weight: bold;
+  line-height: 20px;
+  text-align: center;
+  cursor: pointer;
+}
+
+
+
+/* Content area inside the window */
+.window-content {
+  flex: 1;
+  background: #d0d0d0;
+  padding: 10px;
+  font-size: 14px;
+  overflow-y: auto;
+  border-top: 1px solid #fff;
+  border-left: 1px solid #fff;
+  border-bottom: 1px solid #404040;
+  border-right: 1px solid #404040;
+  line-height: 1.4;
+  box-sizing: border-box;
+}
+
+
+
+.file-icon {
+  width: 48px;
+  height: 48px;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+
+
+.file-explorer {
+  font-family: "Chicago", "Geneva", sans-serif;
+  font-size: 13px;
+  color: black;
+  user-select: none;
+}
+
+.file-header, .file-row {
+  width: 100%;
+  display: flex;
+  padding: 4px 8px;
+}
+
+.file-header {
+  font-weight: bold;
+  border-bottom: 2px solid #404040;
+  background: linear-gradient(to bottom, #e0e0e0, #b0b0b0);
+  text-shadow: 1px 1px 0 #fff;
+  cursor: default;
+}
+
+.file-row:nth-child(even) {
+  background: #d0d0d0;
+}
+
+.file-row:hover {
+  background: #a0a0a0;
+  color: white;
+  cursor: pointer;
+}
+
+.file-col {
+  flex-shrink: 0;
+  padding: 0 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-col.name {
+  flex-grow: 1;
+}
+
+.file-col.date {
+  width: 110px;
+  text-align: right;
+}
+
+.file-col.size {
+  width: 60px;
+  text-align: right;
+}
+
+
+.desktop-icon.trash {
+  position: absolute;
+  top: 48px;
+  right: 16px;
+  width: 64px;
+  text-align: center;
+  font-family: "Chicago", "Geneva", sans-serif;
+  font-size: 12px;
+  color: black;
+  user-select: none;
+  cursor: default;
+}
+
+.desktop-icon.trash img {
+  width: 32px;
+  height: 32px;
+  image-rendering: pixelated; /* Keeps retro pixel look */
+}
+
+#trash-icon {
+  position: absolute;
+  top: 50px;
+  right: 10px; /* aligns to right */
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 64px; /* or your preferred size */
+}
