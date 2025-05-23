@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nickel-DhingyOS</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div id="boot-screen">
+    <div class="boot-text">Nickel-DhingyOS, the computing of yesteryear. </div>
+    <div class="boot-bar">
+      <div class="boot-progress"></div>
+    </div>
+  </div>
+  
+
+
+
+  <div id="menubar">
+    <img src="assets/icons/favicon.png" alt="Menu Icon" style="width:16px; height:16px; object-fit:contain;" />
+    <span class="menu-right"><span id="time"></span> &nbsp;</span>
+  </div>
+
+  <div id="desktop">
+    <div class="desktop-icon">
+      <img src="assets/icons/70.png" alt="About Us" />
+      <span>About Us</span>
+    </div>
+    <div class="desktop-icon">
+      <img src="assets/icons/34.png" alt="Blog" />
+      <span>Blog</span>
+    </div>
+    <div class="desktop-icon" id="trash-icon">
+      <img src="assets/icons/trash-icon.png" alt="Trashcan" />
+      <span>Trashcan</span>
+    </div>
+  </div>
+  
+  <!-- Blog Window -->
+  <div id="blog-window" class="window" style="display:none;">
+    <div class="window-header">
+      <div class="window-title">Blog</div>
+      <button class="close-btn"></button>
+    </div>
+    <div class="window-content" style="padding:10px; background:white; color:black; height: 80%; overflow-y:auto;">
+      <div class="file-explorer">
+        <div class="file-header">
+          <div class="file-col name">Name</div>
+          <div class="file-col date">Date Added</div>
+          <div class="file-col size">Size</div>
+        </div>
+        <div class="file-list">
+          <div class="file-row blog-file" data-post="post1">
+            <div class="file-col name">
+              <img src="assets/icons/79.png" alt="File Icon" class="file-icon" />
+              Welcome!
+            </div>
+            <div class="file-col date">2025-05-22</div>
+            <div class="file-col size">3 KB</div>
+          </div>
+        </div>
+      </div>
+  
+      <!-- Blog post content appears here -->
+      <div id="post-content" style="margin-top: 15px; border-top: 1px solid #ccc; padding-top: 10px;"></div>
+  
+    </div>
+  </div>
+  
+
+  <!-- About Window -->
+  <div id="about-window" class="window" style="display:none;">
+    <div class="window-header">
+      <div class="window-title">About Us</div>
+      <button class="close-btn"></button>
+    </div>
+    <div class="window-content" style="padding:10px; background:white; color:black; height: 80%; overflow-y:auto;">
+      <div class="file-explorer">
+        <div class="file-header">
+          <div class="file-col name">Name</div>
+          <div class="file-col role">Role</div>
+          <div class="file-col size">Size</div>
+        </div>
+        <div class="file-list">
+          <div class="file-row about-file" data-person="person1">
+            <div class="file-col name">
+              <img src="assets/icons/79.png" alt="Person Icon" class="file-icon" />
+              Placeholder1
+            </div>
+            <div class="file-col role">placeholder</div>
+            <div class="file-col size">12 KB</div>
+          </div>
+          <div class="file-row about-file" data-person="person2">
+            <div class="file-col name">
+              <img src="assets/icons/79.png" alt="Person Icon" class="file-icon" />
+              Placeholder2
+            </div>
+            <div class="file-col role">placeholder</div>
+            <div class="file-col size">10 KB</div>
+          </div>
+          <!-- Add more people here -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+ 
+  <div id="trash-window" class="window" style="display:none;">
+    <div class="window-header">
+      <div class="window-title">Trash</div>
+      <button class="close-btn"></button>
+    </div>
+    <div class="window-content" style="padding:10px; background:white; color:black; height: 80%; overflow-y:auto;">
+      <div class="file-explorer">
+        <div class="file-header">
+          <div class="file-col name">Name</div>
+          <div class="file-col date">Date Added</div>
+          <div class="file-col size">Size</div>
+        </div>
+        <div class="file-list">
+          <!-- Example file row with PNG -->
+          <div class="file-row trash-file" data-type="image" data-file="file1">
+            <div class="file-col name">
+              <img src="assets/icons/30.png" alt="File Icon" class="file-icon" />
+              wife.png
+            </div>
+            <div class="file-col date">2025-05-20</div>
+            <div class="file-col size">150 KB</div>
+          </div>
+          <!-- Example file row with non-image -->
+          <div class="file-row trash-file" data-type="text" data-file="file2">
+            <div class="file-col name">
+              <img src="assets/icons/79.png" alt="File Icon" class="file-icon" />
+              God I'm lonely.txt
+            </div>
+            <div class="file-col date">2025-05-19</div>
+            <div class="file-col size">3 KB</div>
+          </div>
+        </div>
+      </div>
+      <!-- Trash preview section -->
+      <div id="trash-preview" style="margin-top: 15px; border-top: 1px solid #ccc; padding-top: 10px;">
+        <!-- Preview content (e.g., image or text) will appear here -->
+      </div>
+    </div>
+  </div>
+
+
+
+  <script src="js/main.js"></script>
+</body>
+</html>
