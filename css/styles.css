@@ -75,7 +75,9 @@ body, html {
   background: #c0c0c0;
   height: 28px; /* increased height */
   display: flex;
-  align-items: center;
+  justify-content: center; /* Centers the content horizontally */
+  align-items: center; /* Centers the content vertically */
+  position: relative;
   padding: 0 12px;
   font-size: 14px; /* slightly larger font */
   font-weight: bold;
