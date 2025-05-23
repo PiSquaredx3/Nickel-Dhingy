@@ -156,7 +156,7 @@ function playClickSound() {
       startupSound.play().catch(() => {
         console.log('Startup sound playback prevented.');
       });
-    }, 150);
+    }, 10000);
   });
 
 
