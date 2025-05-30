@@ -40,78 +40,33 @@
     </div>
   </div>
 
-  <!-- Blog Window -->
-<div id="blog-window" class="window" style="display:none;">
-  <div class="window-header">
-    <span>Blog</span>
-    <button class="close-btn">×</button>
-  </div>
+<!-- About Window -->
+<div id="about-window" class="window" style="display:none;">
+  <div class="window-header"><span>About Us</span><button class="close-btn">×</button></div>
   <div class="window-content">
-    <!-- Dynamically generated blog post list -->
-    <div class="file-list blog-file-list" style="max-height: 200px; overflow-y: auto;">
-      <!-- Blog items will be inserted here by JavaScript -->
-    </div>
-
-    <!-- Post content preview -->
-    <div id="post-content" style="margin-top: 15px; border-top: 1px solid #ccc; padding-top: 10px;">
-      <p>Select a blog post to read.</p>
-    </div>
+    <div id="about-file-list"></div>
+    <div id="person-content"><p>Select a person to view info.</p></div>
   </div>
 </div>
 
-
-  <!-- About Window -->
-  <div id="about-window" class="window" style="display:none;">
-    <div class="window-header">
-      <span>About Us</span>
-      <button class="close-btn">×</button>
-    </div>
-    <div class="window-content">
-      <div
-        class="file-list about-file-list"
-        style="max-height: 200px; overflow-y: auto;"
-      >
-        <!-- About people generated here by JS -->
-      </div>
-      <div
-        id="person-content"
-        style="margin-top: 15px; border-top: 1px solid #ccc; padding-top: 10px"
-      >
-        <p>Select a person to see details.</p>
-      </div>
-    </div>
+<!-- Blog Window -->
+<div id="blog-window" class="window" style="display:none;">
+  <div class="window-header"><span>Blog</span><button class="close-btn">×</button></div>
+  <div class="window-content">
+    <div class="file-list blog-file-list" style="max-height:200px;overflow-y:auto;"></div>
+    <div id="post-content" style="margin-top:15px;border-top:1px solid #ccc;padding-top:10px;"><p>Select a blog post to read.</p></div>
   </div>
+</div>
 
-  <!-- Trash Window -->
-  <div id="trash-window" class="window" style="display:none;">
-    <div class="window-header">
-      <span>Trash</span>
-      <button class="close-btn">×</button>
-    </div>
-    <div
-      class="window-content"
-      style="display: flex; gap: 10px"
-    >
-      <div
-        class="file-list trash-file-list"
-        style="max-height: 200px; overflow-y: auto; width: 200px"
-      >
-        <!-- Trash files generated here by JS -->
-      </div>
-      <div
-        id="trash-preview"
-        style="
-          flex-grow: 1;
-          border: 1px solid #ccc;
-          padding: 10px;
-          max-height: 200px;
-          overflow-y: auto;
-        "
-      >
-        <p>Select a file to preview.</p>
-      </div>
-    </div>
+<!-- Trash Window -->
+<div id="trash-window" class="window" style="display:none;">
+  <div class="window-header"><span>Trash</span><button class="close-btn">×</button></div>
+  <div class="window-content">
+    <div id="trash-file-list" style="max-height:200px;overflow-y:auto;"></div>
+    <div id="trash-preview" style="margin-top:15px;border-top:1px solid #ccc;padding-top:10px;"><p>Select a file to preview.</p></div>
   </div>
+</div>
+
 
   <script src="/js/main.js"></script>
   <script src="/js/windowManager.js"></script>
