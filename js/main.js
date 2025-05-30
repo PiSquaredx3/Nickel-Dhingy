@@ -98,103 +98,138 @@ trashIcon.addEventListener('click', () => openWindow(trashWindow, '140px', '140p
 // --- Make all windows draggable ---
 allWindows.forEach(win => makeDraggable(win));
 
-// --- Blog post selection ---
-const blogFiles = document.querySelectorAll('.blog-file');
-const postContentDiv = document.getElementById('post-content');
+// --- Data Objects for Blog, About, Trash ---
 
 const blogPosts = {
-  post1: `<h4>Test Post 1</h4><p>This is the content for test post 1.</p>`,
-  post2: `<h4>Test Post 2</h4><p>This is the content for test post 2.</p>`
+  post1: {
+    title: "Test Post 1",
+    date: "2025-05-28",
+    content: `<h4>Welcome!</h4><p>We're currently under construction so come back later.</p>`
+  },
+  post2: {
+    title: "Test Post 2",
+    date: "2025-05-27",
+    content: `<h4>Another post</h4><p>More sample content here.</p>`
+  }
 };
-
-
-blogFiles.forEach(file => {
-  file.addEventListener('click', () => {
-    playClickSound();
-    const postKey = file.dataset.post;
-    if (blogPosts[postKey]) {
-      postContentDiv.innerHTML = blogPosts[postKey];
-    } else {
-      postContentDiv.innerHTML = '<p>Post not found.</p>';
-    }
-  });
-});
-
-// --- About person selection ---
-const aboutFiles = document.querySelectorAll('.about-file');
-const personContentDiv = document.getElementById('person-content');
 
 const aboutPeople = {
-  person1: `<h4>Person 1</h4><p>Details about person 1...</p>`,
-  person2: `<h4>Person 2</h4><p>Details about person 2...</p>`
+  person1: {
+    name: "Person 1",
+    date: "2025-05-25",
+    content: `<h4>Person 1</h4><p>Details about person 1...</p>`
+  },
+  person2: {
+    name: "Person 2",
+    date: "2025-05-24",
+    content: `<h4>Person 2</h4><p>Details about person 2...</p>`
+  }
 };
 
-aboutFiles.forEach(file => {
-  file.addEventListener('click', () => {
-    playClickSound();
-    const personKey = file.dataset.person;
-    if (aboutPeople[personKey]) {
-      personContentDiv.innerHTML = aboutPeople[personKey];
-    } else {
-      personContentDiv.innerHTML = '<p>Person not found.</p>';
+const trashFilesData = [
+  {
+    name: "image1.png",
+    date: "2025-05-20",
+    type: "image"
+  },
+  {
+    name: "notes.txt",
+    date: "2025-05-19",
+    type: "text"
+  }
+];
+
+// --- Utility to create file list items ---
+function createFileItem({iconSrc, title, date, onClick}) {
+  const item = document.createElement('div');
+  item.style.display = 'flex';
+  item.style.justifyContent = 'space-between';
+  item.style.alignItems = 'center';
+  item.style.padding = '4px';
+  item.style.cursor = 'pointer';
+
+  item.innerHTML = `
+    <div style="display:flex; align-items:center;">
+      <img src="${iconSrc}" alt="File Icon" style="width:16px; height:16px; margin-right:8px;">
+      <span>${title}</span>
+    </div>
+    <span style="font-size:11px; color:#666;">${date}</span>
+  `;
+
+  item.addEventListener('click', onClick);
+  return item;
+}
+
+// --- Generate Blog Files ---
+const blogFileList = document.querySelector('.blog-file-list');
+const postContentDiv = document.getElementById('post-content');
+
+blogFileList.innerHTML = '';
+for (const key in blogPosts) {
+  const post = blogPosts[key];
+  const item = createFileItem({
+    iconSrc: 'assets/icons/file-icon.png',
+    title: post.title,
+    date: post.date,
+    onClick: () => {
+      postContentDiv.innerHTML = post.content;
     }
   });
-});
+  blogFileList.appendChild(item);
+}
 
-// --- Boot screen loading bar and startup sound ---
-window.addEventListener('load', () => {
-  const progress = document.querySelector('.boot-progress');
-  const startupSound = new Audio('assets/sounds/Startup.wav');
+// --- Generate About Files ---
+const aboutFileList = document.querySelector('.about-file-list');
+const personContentDiv = document.getElementById('person-content');
 
-  progress.style.width = '0%';
-
-  // Animate progress bar fill smoothly on next frames
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      progress.style.width = '100%';
-    });
+aboutFileList.innerHTML = '';
+for (const key in aboutPeople) {
+  const person = aboutPeople[key];
+  const item = createFileItem({
+    iconSrc: 'assets/icons/person-icon.png', // You can provide a person icon
+    title: person.name,
+    date: person.date,
+    onClick: () => {
+      personContentDiv.innerHTML = person.content;
+    }
   });
+  aboutFileList.appendChild(item);
+}
 
-  // After 10 seconds, hide boot screen and show desktop, play sound
-  setTimeout(() => {
-    document.getElementById('boot-screen').style.display = 'none';
-    document.getElementById('desktop').style.display = 'block';
-    startupSound.play().catch(() => {
-      console.log('Startup sound playback prevented.');
-    });
-  }, 10000);
-});
-
-// --- Trash window file preview ---
-const trashFiles = document.querySelectorAll('#trash-window .trash-file');
+// --- Generate Trash Files ---
+const trashFileList = document.querySelector('.trash-file-list');
 const trashPreview = document.getElementById('trash-preview');
 
-trashFiles.forEach(file => {
-  file.addEventListener('click', () => {
-    const fileType = file.dataset.type; // 'image' or 'text'
-    const fileName = file.querySelector('.file-col.name').textContent.trim();
-
-    if (fileType === 'image') {
-      // Show image preview
-      trashPreview.innerHTML = `
-        <h4>${fileName}</h4>
-        <img src="assets/trash/${fileName}" alt="${fileName}" style="max-width:100%; max-height:300px;" />
-      `;
-    } else if (fileType === 'text') {
-      // Fetch and show text preview
-      fetch(`assets/trash/${fileName}`)
-        .then(response => response.text())
-        .then(text => {
-          trashPreview.innerHTML = `
-            <h4>${fileName}</h4>
-            <pre style="white-space:pre-wrap; word-wrap:break-word;">${text}</pre>
-          `;
-        })
-        .catch(() => {
-          trashPreview.innerHTML = `<p>Unable to load the text file.</p>`;
-        });
-    } else {
-      trashPreview.innerHTML = `<p>Unknown file type.</p>`;
+trashFileList.innerHTML = '';
+trashFilesData.forEach(file => {
+  const icon = file.type === 'image' ? 'assets/icons/image-icon.png' : 'assets/icons/text-icon.png';
+  const item = createFileItem({
+    iconSrc: icon,
+    title: file.name,
+    date: file.date,
+    onClick: () => {
+      if (file.type === 'image') {
+        trashPreview.innerHTML = `
+          <h4>${file.name}</h4>
+          <img src="assets/trash/${file.name}" alt="${file.name}" style="max-width:100%; max-height:300px;" />
+        `;
+      } else if (file.type === 'text') {
+        fetch(`assets/trash/${file.name}`)
+          .then(response => response.text())
+          .then(text => {
+            trashPreview.innerHTML = `
+              <h4>${file.name}</h4>
+              <pre style="white-space:pre-wrap; word-wrap:break-word;">${text}</pre>
+            `;
+          })
+          .catch(() => {
+            trashPreview.innerHTML = `<p>Unable to load the text file.</p>`;
+          });
+      } else {
+        trashPreview.innerHTML = `<p>Unknown file type.</p>`;
+      }
     }
   });
+  trashFileList.appendChild(item);
 });
+
