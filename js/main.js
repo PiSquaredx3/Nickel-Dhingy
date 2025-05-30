@@ -42,7 +42,7 @@ function bringToFront(el) {
   return topZIndex;
 }
 
-// --- Update time function remains unchanged ---
+// --- Update time function ---
 function updateTime() {
   const now = new Date();
   let hours = now.getHours();
@@ -83,7 +83,7 @@ trashWindow.querySelector('.close-btn').addEventListener('click', () => {
 // --- Open window helper ---
 function openWindow(win, left = '100px', top = '100px') {
   playClickSound();
-  // removed closeAllWindows(); to allow multiple open windows
+  // allow multiple windows open (no closeAllWindows here)
   win.style.display = 'flex';
   win.style.left = left;
   win.style.top = top;
@@ -139,19 +139,21 @@ aboutFiles.forEach(file => {
   });
 });
 
-// --- Boot screen loading bar and startup sound unchanged ---
+// --- Boot screen loading bar and startup sound ---
 window.addEventListener('load', () => {
   const progress = document.querySelector('.boot-progress');
   const startupSound = new Audio('assets/sounds/Startup.wav');
 
   progress.style.width = '0%';
 
+  // Animate progress bar fill smoothly on next frames
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       progress.style.width = '100%';
     });
   });
 
+  // After 10 seconds, hide boot screen and show desktop, play sound
   setTimeout(() => {
     document.getElementById('boot-screen').style.display = 'none';
     document.getElementById('desktop').style.display = 'block';
@@ -161,13 +163,14 @@ window.addEventListener('load', () => {
   }, 10000);
 });
 
+// --- Trash window file preview ---
 const trashFiles = document.querySelectorAll('#trash-window .trash-file');
 const trashPreview = document.getElementById('trash-preview');
 
 trashFiles.forEach(file => {
   file.addEventListener('click', () => {
-    const fileType = file.dataset.type; // Get the file type (image or text)
-    const fileName = file.querySelector('.file-col.name').textContent.trim(); // Get the file name
+    const fileType = file.dataset.type; // 'image' or 'text'
+    const fileName = file.querySelector('.file-col.name').textContent.trim();
 
     if (fileType === 'image') {
       // Show image preview
@@ -176,7 +179,7 @@ trashFiles.forEach(file => {
         <img src="assets/trash/${fileName}" alt="${fileName}" style="max-width:100%; max-height:300px;" />
       `;
     } else if (fileType === 'text') {
-      // Show text preview
+      // Fetch and show text preview
       fetch(`assets/trash/${fileName}`)
         .then(response => response.text())
         .then(text => {
