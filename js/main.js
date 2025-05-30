@@ -103,8 +103,10 @@ const blogFiles = document.querySelectorAll('.blog-file');
 const postContentDiv = document.getElementById('post-content');
 
 const blogPosts = {
-  post1: `<h4>Welcome!</h4><p>We're currently under construction right now so uh come back later</p>`,
+  post1: `<h4>Test Post 1</h4><p>This is the content for test post 1.</p>`,
+  post2: `<h4>Test Post 2</h4><p>This is the content for test post 2.</p>`
 };
+
 
 blogFiles.forEach(file => {
   file.addEventListener('click', () => {
