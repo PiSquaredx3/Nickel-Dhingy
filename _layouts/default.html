@@ -74,12 +74,35 @@
 
 <!-- Blog Window -->
 <div id="blog-window" class="window" style="display:none;">
-  <div class="window-header"><span>Blog</span><button class="close-btn">×</button></div>
-  <div class="window-content">
-    <div class="file-list blog-file-list" style="max-height:200px; overflow-y:auto;"></div>
-    <div id="post-content" style="margin-top:15px; border-top:1px solid #ccc; padding-top:10px;"><p>Blog post content goes here.</p></div>
+  <div class="window-header">
+    <span>Blog</span>
+    <button class="close-btn">×</button>
+  </div>
+  <div class="window-content file-explorer">
+    <div id="blog-file-list">
+      <div class="file-row">
+        <div class="file-col name">post1</div>
+        <div class="file-col date">2025-05-29</div>
+        <div class="file-col size">2 KB</div>
+      </div>
+      <div class="file-row">
+        <div class="file-col name">post2</div>
+        <div class="file-col date">2025-05-28</div>
+        <div class="file-col size">3 KB</div>
+      </div>
+      <div class="file-row">
+        <div class="file-col name">post3</div>
+        <div class="file-col date">2025-05-27</div>
+        <div class="file-col size">2 KB</div>
+      </div>
+    </div>
+    <div id="blog-content" style="margin-top: 10px;">
+      <p>Select a post to view content.</p>
+    </div>
   </div>
 </div>
+
+
 
 <!-- Trash Window -->
 <div id="trash-window" class="window" style="display:none;">
