@@ -1,5 +1,3 @@
-// windowManager.js
-
 // --- Window dragging support ---
 function makeDraggable(el) {
   let isDragging = false;
@@ -39,3 +37,26 @@ function bringToFront(el) {
 
 // --- Make all windows draggable ---
 document.querySelectorAll('.window').forEach(win => makeDraggable(win));
+
+// --- Icon click handlers ---
+document.querySelectorAll('.desktop-icon').forEach(icon => {
+  icon.addEventListener('click', () => {
+    const iconAlt = icon.querySelector('img').alt.toLowerCase().replace(/\s/g, '');
+    const windowId = `${iconAlt}-window`;
+    const win = document.getElementById(windowId);
+    if (win) {
+      win.style.display = 'block';
+      bringToFront(win);
+    }
+  });
+});
+
+// --- Close button functionality ---
+document.querySelectorAll('.close-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const win = btn.closest('.window');
+    if (win) {
+      win.style.display = 'none';
+    }
+  });
+});
