@@ -1,28 +1,28 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Nickel-DhingyOS</title>
-  <link rel="stylesheet" href="css/styles.css">
-<link href="https://db.onlinewebfonts.com/c/1a243397695904f6f56e490ffd77a9cb?family=ChicagoFLF" rel="stylesheet">
-
-
+  <link rel="stylesheet" href="css/styles.css" />
+  <link
+    href="https://db.onlinewebfonts.com/c/1a243397695904f6f56e490ffd77a9cb?family=ChicagoFLF"
+    rel="stylesheet"
+  />
 </head>
 <body>
   <div id="boot-screen">
-    <div class="boot-text">Nickel-DhingyOS, the computing of yesteryear. </div>
+    <div class="boot-text">Nickel-DhingyOS, the computing of yesteryear.</div>
     <div class="boot-bar">
       <div class="boot-progress"></div>
     </div>
   </div>
-  
-
-
 
   <div id="menubar">
     <span>Nickel-DhingyOS</span>
-    <span class="menu-right"><span id="time"></span> &nbsp;</span>
+    <span class="menu-right">
+      <span id="time"></span> &nbsp;
+    </span>
   </div>
 
   <div id="desktop">
@@ -39,72 +39,120 @@
       <span>Trashcan</span>
     </div>
   </div>
-  
-<!-- Blog Window -->
-<div id="blog-window" class="window" style="display:none;">
-  <div class="window-header">
-    <span>Blog</span>
-    <button class="close-btn">×</button>
-  </div>
-  <div class="window-content">
-    <div class="file-list blog-file-list" style="max-height: 200px; overflow-y: auto;">
-      <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px; cursor: pointer;">
-        <div style="display:flex; align-items:center;">
-          <img src="assets/icons/79.png" alt="File Icon" style="width:16px; height:16px; margin-right:8px;">
-          <span class="blog-post-title" data-post="post1">Test Post 1</span>
+
+  <!-- Blog Window -->
+  <div id="blog-window" class="window" style="display:none;">
+    <div class="window-header">
+      <span>Blog</span>
+      <button class="close-btn">×</button>
+    </div>
+    <div class="window-content">
+      <div
+        class="file-list blog-file-list"
+        style="max-height: 200px; overflow-y: auto;"
+      >
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px;
+            cursor: pointer;
+          "
+        >
+          <div style="display: flex; align-items: center;">
+            <img
+              src="assets/icons/79.png"
+              alt="File Icon"
+              style="width: 16px; height: 16px; margin-right: 8px"
+            />
+            <span class="blog-post-title" data-post="post1">Test Post 1</span>
+          </div>
+          <span style="font-size: 11px; color: #666">2025-05-28</span>
         </div>
-        <span style="font-size:11px; color:#666;">2025-05-28</span>
-      </div>
-      <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px; cursor: pointer;">
-        <div style="display:flex; align-items:center;">
-          <img src="assets/icons/79.png" alt="File Icon" style="width:16px; height:16px; margin-right:8px;">
-          <span class="blog-post-title" data-post="post2">Test Post 2</span>
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px;
+            cursor: pointer;
+          "
+        >
+          <div style="display: flex; align-items: center;">
+            <img
+              src="assets/icons/79.png"
+              alt="File Icon"
+              style="width: 16px; height: 16px; margin-right: 8px"
+            />
+            <span class="blog-post-title" data-post="post2">Test Post 2</span>
+          </div>
+          <span style="font-size: 11px; color: #666">2025-05-27</span>
         </div>
-        <span style="font-size:11px; color:#666;">2025-05-27</span>
+      </div>
+      <div
+        id="post-content"
+        style="margin-top: 15px; border-top: 1px solid #ccc; padding-top: 10px"
+      >
+        <p>Select a blog post to read.</p>
       </div>
     </div>
-    <div id="post-content" style="margin-top: 15px; border-top: 1px solid #ccc; padding-top: 10px;">
-      <p>Select a blog post to read.</p>
+  </div>
+
+  <!-- About Window -->
+  <div id="about-window" class="window" style="display:none;">
+    <div class="window-header">
+      <span>About Us</span>
+      <button class="close-btn">×</button>
+    </div>
+    <div class="window-content">
+      <div
+        class="file-list about-file-list"
+        style="max-height: 200px; overflow-y: auto;"
+      >
+        <!-- About people generated here by JS -->
+      </div>
+      <div
+        id="person-content"
+        style="margin-top: 15px; border-top: 1px solid #ccc; padding-top: 10px"
+      >
+        <p>Select a person to see details.</p>
+      </div>
     </div>
   </div>
-</div>
 
-
-<!-- About Window -->
-<div id="about-window" class="window" style="display:none;">
-  <div class="window-header">
-    <span>About Us</span>
-    <button class="close-btn">×</button>
-  </div>
-  <div class="window-content">
-    <div class="file-list about-file-list" style="max-height: 200px; overflow-y: auto;">
-      <!-- About people generated here by JS -->
+  <!-- Trash Window -->
+  <div id="trash-window" class="window" style="display:none;">
+    <div class="window-header">
+      <span>Trash</span>
+      <button class="close-btn">×</button>
     </div>
-    <div id="person-content" style="margin-top: 15px; border-top: 1px solid #ccc; padding-top: 10px;">
-      <p>Select a person to see details.</p>
-    </div>
-  </div>
-</div>
-
-<!-- Trash Window -->
-<div id="trash-window" class="window" style="display:none;">
-  <div class="window-header">
-    <span>Trash</span>
-    <button class="close-btn">×</button>
-  </div>
-  <div class="window-content" style="display: flex; gap: 10px;">
-    <div class="file-list trash-file-list" style="max-height: 200px; overflow-y: auto; width: 200px;">
-      <!-- Trash files generated here by JS -->
-    </div>
-    <div id="trash-preview" style="flex-grow: 1; border: 1px solid #ccc; padding: 10px; max-height: 200px; overflow-y: auto;">
-      <p>Select a file to preview.</p>
+    <div
+      class="window-content"
+      style="display: flex; gap: 10px"
+    >
+      <div
+        class="file-list trash-file-list"
+        style="max-height: 200px; overflow-y: auto; width: 200px"
+      >
+        <!-- Trash files generated here by JS -->
+      </div>
+      <div
+        id="trash-preview"
+        style="
+          flex-grow: 1;
+          border: 1px solid #ccc;
+          padding: 10px;
+          max-height: 200px;
+          overflow-y: auto;
+        "
+      >
+        <p>Select a file to preview.</p>
+      </div>
     </div>
   </div>
-</div>
-
-
-
 
   <script src="js/main.js"></script>
+  <script src="js/windowManager.js"></script>
 </body>
 </html>
