@@ -1,31 +1,25 @@
-// about.js
+const aboutFiles = {
+  "test1": "<p>test1.</p>",
+  "test2": "<p>test2.</p>",
+  "test3": "<p>test3.</p>"
+};
 
-// Example "files" with title and content
-const aboutFiles = [
-  { title: "test1", content: "<p>test.</p>" },
-  { title: "test2", content: "<p>test2.</p>" },
-  { title: "test3", content: "<p>test3.</p>" }
-];
+function setupAboutFileClicks() {
+  const fileRows = document.querySelectorAll('#about-file-list .file-row');
+  fileRows.forEach(row => {
+    row.style.cursor = 'pointer';
+    row.addEventListener('click', () => {
+      // Get the file name from the .file-col.name div inside this row
+      const title = row.querySelector('.file-col.name').textContent.trim();
+      const content = aboutFiles[title] || "<p>No content available.</p>";
+      document.getElementById('person-content').innerHTML = content;
 
-// Function to render files in the About Us file list
-function renderAboutFiles() {
-  const fileList = document.getElementById('about-file-list');
-  fileList.innerHTML = ''; // Clear existing
-
-  aboutFiles.forEach((file, index) => {
-    const fileDiv = document.createElement('div');
-    fileDiv.classList.add('about-file');
-    fileDiv.textContent = file.title;
-    fileDiv.style.cursor = 'pointer';
-
-    // Click to show content
-    fileDiv.addEventListener('click', () => {
-      document.getElementById('person-content').innerHTML = file.content;
+      // Optional: Highlight selected row
+      fileRows.forEach(r => r.classList.remove('selected'));
+      row.classList.add('selected');
     });
-
-    fileList.appendChild(fileDiv);
   });
 }
 
-// Run on script load
-renderAboutFiles();
+// Call this on page load or window open
+setupAboutFileClicks();
