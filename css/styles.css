@@ -175,18 +175,30 @@ body, html {
   border-right: 1px solid #808080;
   border-bottom: 1px solid #000;
   box-sizing: border-box;
+  user-select: none;
+  cursor: move;
 }
 
+/* Wrap the title in a flex container that expands */
+.window-header .title-wrapper {
+  position: absolute;
+  left: 0;
+  right: 0;
+  text-align: center;
+  pointer-events: none; /* So clicks pass through */
+  user-select: none;
+  font-weight: normal;
+}
 
-.window-title {
-  margin: 0 auto;
-  pointer-events: none;
-  white-space: nowrap;
+/* The title text itself */
+.window-header .title-text {
+  display: inline-block;
+  pointer-events: auto; /* Allow text selection if needed */
 }
 
 .close-btn {
-  width: 13px;
-  height: 13px;
+  width: 16px;
+  height: 16px;
   background: #c0c0c0;
   border: 1px solid #000;
   display: flex;
@@ -198,7 +210,17 @@ body, html {
   line-height: 1;
   margin-right: 4px;
   cursor: pointer;
+  margin-left: auto;
 }
+
+
+
+.window-title {
+  margin: 0 auto;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
 
 
 
