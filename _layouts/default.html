@@ -42,12 +42,28 @@
 
 <!-- About Window -->
 <div id="about-window" class="window" style="display:none;">
-  <div class="window-header"><span>About Us</span><button class="close-btn">×</button></div>
-  <div class="window-content">
-    <div id="about-file-list"></div>
-    <div id="person-content"><p>About content goes here.</p></div>
+  <div class="window-header">
+    <span>About Us</span>
+    <button class="close-btn">×</button>
+  </div>
+  <div class="window-content" style="display: flex; gap: 15px; height: 300px; padding: 10px;">
+    <div
+      id="about-file-list"
+      style="flex: 1; border-right: 1px solid #ccc; overflow-y: auto; padding-right: 10px;"
+    >
+      <div class="about-file" style="cursor:pointer;">test1</div>
+      <div class="about-file" style="cursor:pointer;">test2</div>
+      <div class="about-file" style="cursor:pointer;">test3</div>
+    </div>
+    <div
+      id="person-content"
+      style="flex: 2; padding-left: 10px; overflow-y: auto;"
+    >
+      <p>About content goes here.</p>
+    </div>
   </div>
 </div>
+
 
 <!-- Blog Window -->
 <div id="blog-window" class="window" style="display:none;">
