@@ -6,7 +6,7 @@
 
 body, html {
   height: 100%;
-  font-family: 'Chicago', 'Geneva', sans-serif;
+  font-family: 'ChicagoFLF', monospace;
   overflow: hidden;
   background-color: #31427b; /* NickelDhingyOS blue */
   user-select: none;
@@ -104,11 +104,13 @@ body, html {
 
 #desktop {
   display: flex;
-  gap: 40px;            /* increase horizontal spacing between icons */
+  flex-wrap: wrap;             /* allow multiple rows */
+  gap: 40px 40px;              /* row-gap (vertical) then column-gap (horizontal) */
   padding: 20px;
-  justify-content: flex-end; /* align icons to the right */
-  /* optionally, keep vertical centering */
-  align-items: center; 
+  justify-content: flex-end;   /* align icons to the right */
+  align-items: flex-start;     /* align rows to the top */
+  height: 100vh;               /* ensure enough space for vertical spacing */
+  align-content: start;        /* controls spacing between rows */
 }
 
 
@@ -117,6 +119,7 @@ body, html {
   flex-direction: column;
   align-items: center;
   width: 64px;
+  height: 64px;
   cursor: pointer;
   user-select: none;
 }
@@ -129,9 +132,10 @@ body, html {
 .desktop-icon span {
   margin-top: 4px;
   font-size: 12px;
+  font-family: 'ChicagoFLF', monospace;
   text-align: center;
-  color: white;
-  text-shadow: 1px 1px 2px black;
+  color: black;
+  background: #bcc5d5;
 }
 
 .window {
