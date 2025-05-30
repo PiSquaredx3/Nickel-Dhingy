@@ -38,11 +38,18 @@ function bringToFront(el) {
 // --- Make all windows draggable ---
 document.querySelectorAll('.window').forEach(win => makeDraggable(win));
 
+// --- Icon to window mapping ---
+const iconWindowMap = {
+  'About Us': 'about-window',
+  'Blog': 'blog-window',
+  'Trashcan': 'trash-window'
+};
+
 // --- Icon click handlers ---
 document.querySelectorAll('.desktop-icon').forEach(icon => {
   icon.addEventListener('click', () => {
-    const iconAlt = icon.querySelector('img').alt.toLowerCase().replace(/\s/g, '');
-    const windowId = `${iconAlt}-window`;
+    const label = icon.querySelector('span').textContent.trim();
+    const windowId = iconWindowMap[label];
     const win = document.getElementById(windowId);
     if (win) {
       win.style.display = 'block';
