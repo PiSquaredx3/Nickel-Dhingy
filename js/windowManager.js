@@ -93,7 +93,7 @@ function renderBlogList() {
     const icon = document.createElement('img');
     icon.src = 'assets/icons/79.png';
     icon.alt = 'File Icon';
-    icon.style = 'width:16px;height:16px;margin-right:8px;';
+    icon.style = 'width:32px;height:32px;margin-right:8px;';
     
     const title = document.createElement('span');
     title.className = 'blog-post-title';
