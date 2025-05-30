@@ -145,124 +145,127 @@ body, html {
   width: 800px;
   height: 600px;
   background: #c0c0c0; /* Classic light gray */
-  border-top: 2px solid #fff;      /* Highlight */
-  border-left: 2px solid #fff;     /* Highlight */
-  border-bottom: 2px solid #404040; /* Shadow */
-  border-right: 2px solid #404040;  /* Shadow */
-  box-shadow:
-    inset 1px 1px 0 #fff,         /* Inner highlight */
-    inset -1px -1px 0 #404040;    /* Inner shadow */
-  display: flex;
-  flex-direction: column;
-  font-family: "Chicago", "Geneva", sans-serif; /* Classic Mac font */
+  border-top: 1px solid #fff;
+  border-left: 1px solid #fff;
+  border-right: 1px solid #808080;
+  border-bottom: 1px solid #000;
+  font-family: 'ChicagoFLF', 'Chicago', 'Geneva', sans-serif;
   color: black;
   user-select: none;
-  /* Add subtle outer shadow for slight depth */
-  filter: drop-shadow(3px 3px 3px rgba(0,0,0,0.25));
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
 }
+
 
 .window-header {
   position: relative;
-  height: 24px;
+  height: 22px;
+  background: #c0c0c0;
   display: flex;
   align-items: center;
-  justify-content: center; /* Center contents */
-  padding: 0 10px;
-  background: linear-gradient(to bottom, #e0e0e0, #b0b0b0);
-  border-bottom: 2px solid #404040;
-  font-weight: bold;
-  font-size: 13px;
-  color: #000;
-  text-shadow: 1px 1px 0 #fff;
+  padding: 0 6px;
+  font-family: 'ChicagoFLF', 'Chicago', 'Geneva', sans-serif;
+  font-size: 15px;
+  font-weight: normal;
+  color: black;
+  text-shadow: none;
   border-top: 1px solid #fff;
   border-left: 1px solid #fff;
-  border-bottom: 1px solid #404040;
-  border-right: 1px solid #404040;
+  border-right: 1px solid #808080;
+  border-bottom: 1px solid #000;
+  box-sizing: border-box;
 }
 
+
 .window-title {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  margin: 0 auto;
   pointer-events: none;
   white-space: nowrap;
 }
 
 .close-btn {
-  margin-left: -100%;
-  width: 20px;
-  height: 20px;
-  background: linear-gradient(to bottom, #c0c0c0, #808080);
-  border: 2px solid #404040;
-  box-shadow: inset 1px 1px 0 #fff, inset -1px -1px 0 #404040;
-  color: black;
+  width: 13px;
+  height: 13px;
+  background: #c0c0c0;
+  border: 1px solid #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
   font-weight: bold;
-  line-height: 20px;
-  text-align: center;
+  font-family: sans-serif;
+  line-height: 1;
+  margin-right: 4px;
   cursor: pointer;
 }
+
 
 
 
 /* Content area inside the window */
 .window-content {
   flex: 1;
-  background: #d0d0d0;
-  padding: 10px;
-  font-size: 14px;
+  background: #c0c0c0; /* Flatter gray like Mac OS 9 windows */
+  padding: 8px;
+  font-size: 11px;
+  font-family: 'ChicagoFLF', 'Chicago', 'Geneva', sans-serif;
+  line-height: 1.3;
+  color: black;
   overflow-y: auto;
-  border-top: 1px solid #fff;
-  border-left: 1px solid #fff;
-  border-bottom: 1px solid #404040;
-  border-right: 1px solid #404040;
-  line-height: 1.4;
+  border-left: 1px solid #000;
+  border-right: 1px solid #000;
+  border-bottom: 1px solid #000;
   box-sizing: border-box;
 }
 
 
 
+
 .file-icon {
-  width: 48px;
-  height: 48px;
+  width: 32px;
+  height: 32px;
   vertical-align: middle;
-  margin-right: 6px;
+  margin-right: 4px;
 }
 
-
 .file-explorer {
-  font-family: "Chicago", "Geneva", sans-serif;
-  font-size: 13px;
+  font-family: 'ChicagoFLF', 'Chicago', 'Geneva', sans-serif;
+  font-size: 11px;
   color: black;
   user-select: none;
+  background: #c0c0c0;
+  border: 1px solid #000;
 }
 
 .file-header, .file-row {
   width: 100%;
   display: flex;
-  padding: 4px 8px;
+  padding: 2px 6px;
+  border-bottom: 1px solid #000;
 }
 
 .file-header {
-  font-weight: bold;
-  border-bottom: 2px solid #404040;
-  background: linear-gradient(to bottom, #e0e0e0, #b0b0b0);
-  text-shadow: 1px 1px 0 #fff;
+  font-weight: normal;
+  background: #d0d0d0;
+  border-bottom: 1px solid #000;
+  text-shadow: none;
   cursor: default;
 }
 
 .file-row:nth-child(even) {
-  background: #d0d0d0;
+  background: #c8c8c8;
 }
 
 .file-row:hover {
-  background: #a0a0a0;
+  background: #808080;
   color: white;
   cursor: pointer;
 }
 
 .file-col {
   flex-shrink: 0;
-  padding: 0 8px;
+  padding: 0 6px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -273,7 +276,7 @@ body, html {
 }
 
 .file-col.date {
-  width: 110px;
+  width: 100px;
   text-align: right;
 }
 
@@ -281,6 +284,7 @@ body, html {
   width: 60px;
   text-align: right;
 }
+
 
 
 .desktop-icon.trash {
