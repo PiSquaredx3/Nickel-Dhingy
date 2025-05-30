@@ -79,11 +79,61 @@ trashIcon.addEventListener('click', () => openWindow(trashWindow, '140px', '140p
 // --- Make all windows draggable ---
 allWindows.forEach(win => makeDraggable(win));
 
-// --- Blog posts data ---
-const blogPosts = {
-  post1: `<h4>Welcome!</h4><p>We're currently under construction right now so uh come back later</p>`,
-  post2: `<h4>Second Post</h4><p>This is another blog test post content.</p>`
-};
+const blogPosts = [
+  {
+    title: 'Test Post 1',
+    content: 'This is the content of Test Post 1.',
+    date: '2025-05-28'
+  },
+  {
+    title: 'Test Post 2',
+    content: 'This is the content of Test Post 2.',
+    date: '2025-05-27'
+  }
+];
+
+const blogList = document.querySelector('.blog-file-list');
+const postContent = document.getElementById('post-content');
+blogPosts.forEach((post, index) => {
+  const item = document.createElement('div');
+  item.style.display = 'flex';
+  item.style.justifyContent = 'space-between';
+  item.style.alignItems = 'center';
+  item.style.padding = '4px';
+  item.style.cursor = 'pointer';
+
+  const left = document.createElement('div');
+  left.style.display = 'flex';
+  left.style.alignItems = 'center';
+
+  const icon = document.createElement('img');
+  icon.src = 'assets/icons/79.png';
+  icon.alt = 'File Icon';
+  icon.style.width = '16px';
+  icon.style.height = '16px';
+  icon.style.marginRight = '8px';
+
+  const title = document.createElement('span');
+  title.classList.add('blog-post-title');
+  title.textContent = post.title;
+
+  left.appendChild(icon);
+  left.appendChild(title);
+
+  const date = document.createElement('span');
+  date.style.fontSize = '11px';
+  date.style.color = '#666';
+  date.textContent = post.date;
+
+  item.appendChild(left);
+  item.appendChild(date);
+
+  item.addEventListener('click', () => {
+    postContent.innerHTML = `<p>${post.content}</p>`;
+  });
+
+  blogList.appendChild(item);
+});
 
 // --- About people data ---
 const aboutPeople = {
