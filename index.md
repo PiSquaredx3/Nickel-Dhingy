@@ -1,4 +1,4 @@
 ---
 layout: default
-title: Nickel-DhingyOS
+title: Nickel-Dhingy
 ---
