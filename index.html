@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#111b2d" />
+  <title>Nickel-Dhingy.com — Classic PC &amp; Console Games</title>
+  <link rel="stylesheet" href="mycss/styles.css" />
+  <script type="module" src="myjs/forum.js"></script>
+</head>
+<body>
+  <div class="site-shell">
+    <header class="masthead">
+      <div class="masthead-top">
+        <a class="brand" href="#top" aria-label="Nickel-Dhingy home">
+          <img src="_layouts/assets/nickel-dhingy-logo.png" alt="Nickel-Dhingy.com" class="logo" />
+        </a>
+        <div class="account-links" id="account-links">
+          <button type="button" class="text-button" data-auth="signup">Sign up</button>
+          <span aria-hidden="true">|</span>
+          <button type="button" class="text-button" data-auth="login">Log in</button>
+        </div>
+      </div>
+      <p class="tagline">Your corner of the web since 1999.</p>
+      <nav class="main-nav" aria-label="Main navigation">
+        <a class="active" href="#forums">Forum Index</a>
+        <a href="#community">Community</a>
+        <a href="#guidelines">Guidelines</a>
+      </nav>
+    </header>
+
+    <main id="top" class="page-content">
+      <div class="content-grid">
+        <section id="forums" class="forum-column" aria-labelledby="forums-title">
+          <div class="section-heading">
+            <h2 id="forums-title">Classic PC &amp; Console Game Boards</h2>
+            <span class="heading-note">Half-Life, SNES, N64, PS1 &amp; more</span>
+          </div>
+
+          <div class="forum-table-wrap">
+            <table class="forum-table">
+              <thead>
+                <tr>
+                  <th scope="col">Forum</th>
+                  <th scope="col" class="count-column">Topics</th>
+                  <th scope="col" class="count-column">Replies</th>
+                  <th scope="col" class="last-post-column">Latest Topic</th>
+                </tr>
+              </thead>
+              <tbody id="board-list">
+                <tr><td colspan="4" class="empty-state">Connecting to the forum…</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p id="forum-message" class="forum-footnote" role="status"></p>
+
+          <section id="board-view" class="forum-view" hidden aria-live="polite"></section>
+          <section id="topic-view" class="forum-view" hidden aria-live="polite"></section>
+          <section id="composer-view" class="forum-view" hidden></section>
+        </section>
+
+        <aside class="sidebar">
+          <section id="community" class="side-panel">
+            <h2>Community Stats</h2>
+            <dl class="stats-list">
+              <div><dt>Members</dt><dd data-stat="members">—</dd></div>
+              <div><dt>Topics</dt><dd data-stat="topics">—</dd></div>
+              <div><dt>Replies</dt><dd data-stat="replies">—</dd></div>
+            </dl>
+            <p class="online-note" id="newest-member">Member activity will appear here.</p>
+          </section>
+
+          <section id="guidelines" class="side-panel">
+            <h2>Community Guidelines</h2>
+            <p class="panel-copy">Be Nice and don't start just sending pirated games... I'm not Vimm's Lair or your personal NAS.</p>
+            <p class="panel-copy">Need help with your account? Contact the site administrator.</p>
+          </section>
+
+          <section class="side-panel members-panel">
+            <h2>Your Next Continue?</h2>
+            <p>Start a topic about the game you still think about. The first post on a new board is yours to make.</p>
+            <button type="button" class="panel-action" data-auth="signup">Join the forum</button>
+          </section>
+        </aside>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      <div><strong>Nickel-Dhingy.com</strong><span> i'm... i'm not a creative writer.</span></div>
+      <div><a href="#top">Back to top ↑</a><span class="footer-divider">|</span><a href="#guidelines">Community guidelines</a></div>
+      <p>Be kind to each other, please</p>
+    </footer>
+  </div>
+
+  <dialog id="auth-dialog" class="site-dialog">
+    <form id="auth-form" class="dialog-card">
+      <div class="dialog-heading">
+        <h2 id="auth-title">Join the forum</h2>
+        <button type="button" class="close-button" data-close-dialog aria-label="Close">×</button>
+      </div>
+      <p id="auth-description" class="dialog-copy">Create an account to start posting.</p>
+      <label id="username-field" class="form-field" hidden>
+        Forum name
+        <input name="username" type="text" minlength="3" maxlength="24" pattern="[A-Za-z0-9_]+" autocomplete="username" />
+        <small>3–24 letters, numbers, or underscores.</small>
+      </label>
+      <label class="form-field">
+        Email
+        <input name="email" type="email" required maxlength="254" autocomplete="email" />
+      </label>
+      <label class="form-field">
+        Password
+        <input name="password" type="password" required minlength="8" maxlength="72" autocomplete="current-password" />
+      </label>
+      <p id="auth-message" class="form-message" role="status"></p>
+      <button id="auth-submit" type="submit" class="primary-button">Create account</button>
+      <button type="button" id="auth-switch" class="text-button switch-button">Already a member? Log in</button>
+    </form>
+  </dialog>
+</body>
+</html>

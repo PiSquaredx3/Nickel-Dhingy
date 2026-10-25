@@ -1,0 +1,507 @@
+import { supabaseAnonKey, supabaseUrl } from "../supabase-config.js";
+
+const boardList = document.querySelector("#board-list");
+const forumMessage = document.querySelector("#forum-message");
+const boardView = document.querySelector("#board-view");
+const topicView = document.querySelector("#topic-view");
+const composerView = document.querySelector("#composer-view");
+const indexPanel = document.querySelector(".forum-table-wrap");
+const authDialog = document.querySelector("#auth-dialog");
+const authForm = document.querySelector("#auth-form");
+const authMessage = document.querySelector("#auth-message");
+const usernameField = document.querySelector("#username-field");
+const authPassword = authForm.elements.password;
+const authMode = { value: "signup" };
+let supabase;
+let currentUser;
+let boards = [];
+
+function setForumMessage(message, isError = false) {
+  forumMessage.textContent = message;
+  forumMessage.classList.toggle("error-message", isError);
+}
+
+function makeElement(tag, className, text) {
+  const element = document.createElement(tag);
+  if (className) element.className = className;
+  if (text !== undefined) element.textContent = text;
+  return element;
+}
+
+function makeButton(text, action, className = "small-button") {
+  const button = makeElement("button", className, text);
+  button.type = "button";
+  button.dataset.action = action;
+  return button;
+}
+
+function formatDate(value) {
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(new Date(value));
+}
+
+function setStat(name, value) {
+  document.querySelector(`[data-stat="${name}"]`).textContent = value.toLocaleString();
+}
+
+function updateAccount(user) {
+  currentUser = user;
+  const links = document.querySelector("#account-links");
+  links.replaceChildren();
+
+  if (user) {
+    const username = user.user_metadata?.username || "member";
+    links.append(makeElement("span", "account-name", username));
+    links.append(makeButton("Log out", "logout", "text-button"));
+  } else {
+    links.append(makeButton("Sign up", "auth-signup", "text-button"));
+    links.append(makeElement("span", "", "|"));
+    links.append(makeButton("Log in", "auth-login", "text-button"));
+  }
+}
+
+function renderBoards() {
+  boardList.replaceChildren();
+  let category = "";
+
+  for (const board of boards) {
+    if (board.category !== category) {
+      category = board.category;
+      const headingRow = document.createElement("tr");
+      headingRow.className = "category-row";
+      const heading = document.createElement("th");
+      heading.scope = "colgroup";
+      heading.colSpan = 4;
+      heading.textContent = category;
+      headingRow.append(heading);
+      boardList.append(headingRow);
+    }
+
+    const row = document.createElement("tr");
+    const nameCell = makeElement("td", "forum-name-cell");
+    const link = makeElement("a", "forum-name", board.title);
+    link.href = `#board/${encodeURIComponent(board.slug)}`;
+    nameCell.append(link);
+
+    const topicCount = makeElement("td", "count-column", (board.topicCount || 0).toLocaleString());
+    const replyCount = makeElement("td", "count-column", (board.replyCount || 0).toLocaleString());
+    const latestCell = makeElement("td", "last-post-column");
+    if (board.latestTopic) {
+      const latestLink = makeElement("a", "", board.latestTopic.title);
+      latestLink.href = `#topic/${board.latestTopic.id}`;
+      const metadata = makeElement("span", "");
+      metadata.append(
+        document.createTextNode(`by ${board.latestTopic.author || "member"} · `),
+        document.createElement("br"),
+        document.createTextNode(formatDate(board.latestTopic.updated_at))
+      );
+      latestCell.append(latestLink, metadata);
+    } else {
+      latestCell.append(makeElement("span", "no-activity", "No topics yet"));
+    }
+    row.append(nameCell, topicCount, replyCount, latestCell);
+    boardList.append(row);
+  }
+}
+
+async function loadBoards() {
+  const { data, error } = await supabase.from("boards")
+    .select("id,slug,title,category,position")
+    .order("position");
+  if (error) throw error;
+
+  boards = data;
+  await Promise.all(boards.map(async board => {
+    const [topicResult, replyResult, latestResult] = await Promise.all([
+      supabase.from("topics").select("id", { count: "exact", head: true }).eq("board_id", board.id),
+      supabase.from("replies")
+        .select("id,topics!inner(board_id)", { count: "exact", head: true })
+        .eq("topics.board_id", board.id),
+      supabase.from("topics")
+        .select("id,title,updated_at,profiles!topics_author_id_fkey(username),replies(count)")
+        .eq("board_id", board.id)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    ]);
+    if (topicResult.error) throw topicResult.error;
+    if (replyResult.error) throw replyResult.error;
+    if (latestResult.error) throw latestResult.error;
+    board.topicCount = topicResult.count || 0;
+    board.replyCount = replyResult.count || 0;
+    board.latestTopic = latestResult.data ? {
+      ...latestResult.data,
+      author: latestResult.data.profiles?.username
+    } : null;
+  }));
+  renderBoards();
+}
+
+async function loadStats() {
+  const [members, topics, replies, newest] = await Promise.all([
+    supabase.from("profiles").select("id", { count: "exact", head: true }),
+    supabase.from("topics").select("id", { count: "exact", head: true }),
+    supabase.from("replies").select("id", { count: "exact", head: true }),
+    supabase.from("profiles").select("username,created_at").order("created_at", { ascending: false }).limit(1).maybeSingle()
+  ]);
+  for (const result of [members, topics, replies, newest]) {
+    if (result.error) throw result.error;
+  }
+  setStat("members", members.count || 0);
+  setStat("topics", topics.count || 0);
+  setStat("replies", replies.count || 0);
+  const newestMember = document.querySelector("#newest-member");
+  newestMember.textContent = newest.data
+    ? `Newest member: ${newest.data.username} · ${formatDate(newest.data.created_at)}`
+    : "No members have joined yet.";
+}
+
+async function refreshForum() {
+  setForumMessage("Loading the boards…");
+  try {
+    await Promise.all([loadBoards(), loadStats()]);
+    setForumMessage("Board activity and counts are live from the forum database.");
+  } catch (error) {
+    console.error("Could not load forum data:", error);
+    setForumMessage(`Could not load forum data: ${error.message}`, true);
+  }
+}
+
+function appendBackLink(container, label = "← Forum index") {
+  const back = makeElement("a", "back-link", label);
+  back.href = "#forums";
+  container.append(back);
+}
+
+async function showBoard(slug) {
+  const board = boards.find(item => item.slug === slug);
+  if (!board) {
+    setForumMessage("That board could not be found.", true);
+    return;
+  }
+  boardView.hidden = false;
+  topicView.hidden = true;
+  composerView.hidden = true;
+  indexPanel.hidden = true;
+  boardView.replaceChildren();
+  appendBackLink(boardView);
+  boardView.append(makeElement("h2", "view-title", board.title));
+  boardView.append(makeButton("Start a topic", `compose:${board.slug}`, "primary-button"));
+  const list = makeElement("div", "topic-list");
+  list.append(makeElement("p", "empty-state", "Loading topics…"));
+  boardView.append(list);
+
+  try {
+    const { data, error } = await supabase.from("topics")
+      .select("id,title,body,created_at,updated_at,profiles!topics_author_id_fkey(username),replies(count)")
+      .eq("board_id", board.id)
+      .order("updated_at", { ascending: false })
+      .range(0, 49);
+    if (error) throw error;
+    list.replaceChildren();
+    if (!data.length) {
+      list.append(makeElement("p", "empty-state", "No topics here yet. Start the first conversation."));
+      return;
+    }
+    for (const topic of data) {
+      const item = makeElement("article", "topic-list-item");
+      const title = makeElement("a", "topic-list-title", topic.title);
+      title.href = `#topic/${topic.id}`;
+      item.append(title);
+      const replyCount = topic.replies?.[0]?.count || 0;
+      item.append(makeElement("p", "topic-meta", `${topic.profiles?.username || "member"} · ${formatDate(topic.updated_at)} · ${replyCount} replies`));
+      item.append(makeElement("p", "topic-preview", topic.body));
+      list.append(item);
+    }
+  } catch (error) {
+    console.error("Could not load board topics:", error);
+    list.replaceChildren(makeElement("p", "form-message error-message", `Could not load topics: ${error.message}`));
+  }
+}
+
+function renderPost(author, date, body, className) {
+  const post = makeElement("article", `forum-post ${className}`);
+  const header = makeElement("div", "post-header");
+  header.append(makeElement("strong", "", author || "member"), makeElement("time", "", formatDate(date)));
+  post.append(header, makeElement("p", "post-body", body));
+  return post;
+}
+
+async function showTopic(id) {
+  topicView.hidden = false;
+  boardView.hidden = true;
+  composerView.hidden = true;
+  indexPanel.hidden = true;
+  topicView.replaceChildren(makeElement("p", "empty-state", "Loading conversation…"));
+
+  try {
+    const [{ data: topic, error: topicError }, { data: replies, error: replyError }] = await Promise.all([
+      supabase.from("topics")
+        .select("id,board_id,title,body,created_at,profiles!topics_author_id_fkey(username)")
+        .eq("id", id)
+        .maybeSingle(),
+      supabase.from("replies")
+        .select("id,body,created_at,profiles!replies_author_id_fkey(username)")
+        .eq("topic_id", id)
+        .order("created_at")
+    ]);
+    if (topicError) throw topicError;
+    if (replyError) throw replyError;
+    if (!topic) throw new Error("This topic no longer exists.");
+
+    const board = boards.find(item => item.id === topic.board_id);
+    topicView.replaceChildren();
+    appendBackLink(topicView, `← ${board?.title || "Forum index"}`);
+    topicView.append(makeElement("h2", "view-title", topic.title));
+    topicView.append(renderPost(topic.profiles?.username, topic.created_at, topic.body, "topic-first-post"));
+    for (const reply of replies) {
+      topicView.append(renderPost(reply.profiles?.username, reply.created_at, reply.body, "topic-reply"));
+    }
+
+    if (currentUser) {
+      const replyForm = makePostForm("Write a reply", "Post reply", async body => {
+        const { error } = await supabase.from("replies").insert({
+          topic_id: topic.id,
+          author_id: currentUser.id,
+          body
+        });
+        if (error) throw error;
+        await refreshForum();
+        await showTopic(topic.id);
+      });
+      topicView.append(replyForm);
+    } else {
+      const prompt = makeElement("p", "empty-state", "Sign in to reply to this conversation.");
+      prompt.append(" ", makeButton("Log in", "auth-login"));
+      topicView.append(prompt);
+    }
+  } catch (error) {
+    console.error("Could not load topic:", error);
+    topicView.replaceChildren(makeElement("p", "form-message error-message", `Could not load topic: ${error.message}`));
+  }
+}
+
+function makePostForm(heading, submitLabel, onSubmit, leadingFields = []) {
+  const form = document.createElement("form");
+  form.className = "post-form";
+  form.append(makeElement("h3", "form-heading", heading));
+  form.append(...leadingFields);
+  const label = makeElement("label", "form-field", "Message");
+  const textarea = document.createElement("textarea");
+  textarea.name = "body";
+  textarea.required = true;
+  textarea.maxLength = 10000;
+  textarea.rows = 6;
+  textarea.autocomplete = "off";
+  label.append(textarea);
+  form.append(label);
+  const feedback = makeElement("p", "form-message");
+  feedback.setAttribute("role", "status");
+  form.append(feedback);
+  const submit = makeElement("button", "primary-button", submitLabel);
+  submit.type = "submit";
+  form.append(submit);
+  form.addEventListener("submit", async event => {
+    event.preventDefault();
+    submit.disabled = true;
+    feedback.textContent = "Posting…";
+    try {
+      const body = textarea.value.trim();
+      if (!body) throw new Error("Write a message before posting.");
+      await onSubmit(body);
+    } catch (error) {
+      console.error("Could not submit forum post:", error);
+      feedback.textContent = error.message;
+      feedback.classList.add("error-message");
+      submit.disabled = false;
+    }
+  });
+  return form;
+}
+
+function showComposer(slug) {
+  const board = boards.find(item => item.slug === slug);
+  if (!board) {
+    setForumMessage("That board could not be found.", true);
+    return;
+  }
+  if (!currentUser) {
+    openAuth("signup");
+    return;
+  }
+
+  boardView.hidden = true;
+  topicView.hidden = true;
+  composerView.hidden = false;
+  indexPanel.hidden = true;
+  composerView.replaceChildren();
+  appendBackLink(composerView, `← ${board.title}`);
+  composerView.append(makeElement("h2", "view-title", `Start a topic in ${board.title}`));
+
+  const titleLabel = makeElement("label", "form-field", "Topic title");
+  const titleInput = document.createElement("input");
+  titleInput.name = "title";
+  titleInput.required = true;
+  titleInput.minLength = 1;
+  titleInput.maxLength = 120;
+  titleInput.autocomplete = "off";
+  titleLabel.append(titleInput);
+  const form = makePostForm("Start a new topic", "Post topic", async body => {
+    const title = titleInput.value.trim();
+    if (!title) throw new Error("Add a title before posting.");
+    const { data, error } = await supabase.from("topics")
+      .insert({ board_id: board.id, author_id: currentUser.id, title, body })
+      .select("id")
+      .single();
+    if (error) throw error;
+    await refreshForum();
+    window.location.hash = `topic/${data.id}`;
+  }, [titleLabel]);
+  form.addEventListener("submit", event => {
+    if (!titleInput.value.trim()) {
+      event.preventDefault();
+      titleInput.setCustomValidity("Add a title before posting.");
+      titleInput.reportValidity();
+      titleInput.setCustomValidity("");
+    }
+  }, true);
+  composerView.append(form);
+}
+
+function handleRoute() {
+  const route = decodeURIComponent(window.location.hash.slice(1));
+  if (route.startsWith("board/")) {
+    showBoard(route.slice("board/".length));
+  } else if (route.startsWith("topic/")) {
+    showTopic(route.slice("topic/".length));
+  } else if (route.startsWith("compose/")) {
+    showComposer(route.slice("compose/".length));
+  } else {
+    indexPanel.hidden = false;
+    boardView.hidden = true;
+    topicView.hidden = true;
+    composerView.hidden = true;
+  }
+}
+
+function openAuth(mode) {
+  authMode.value = mode;
+  const signingUp = mode === "signup";
+  document.querySelector("#auth-title").textContent = signingUp ? "Join the forum" : "Welcome back";
+  document.querySelector("#auth-description").textContent = signingUp
+    ? "Create an account to start posting."
+    : "Log in to continue the conversation.";
+  document.querySelector("#auth-submit").textContent = signingUp ? "Create account" : "Log in";
+  document.querySelector("#auth-switch").textContent = signingUp ? "Already a member? Log in" : "Need an account? Sign up";
+  usernameField.hidden = !signingUp;
+  authForm.elements.username.required = signingUp;
+  authPassword.autocomplete = signingUp ? "new-password" : "current-password";
+  authMessage.textContent = "";
+  authMessage.classList.remove("error-message");
+  authDialog.showModal();
+}
+
+document.addEventListener("click", event => {
+  const authButton = event.target.closest("[data-auth]");
+  if (authButton) {
+    if (!supabase) {
+      setForumMessage("Forum setup is not finished. Add the Supabase project details first.", true);
+      return;
+    }
+    openAuth(authButton.dataset.auth);
+    return;
+  }
+  const actionButton = event.target.closest("[data-action]");
+  if (!actionButton) return;
+  const action = actionButton.dataset.action;
+  if (action === "auth-signup" || action === "auth-login") {
+    if (!supabase) {
+      setForumMessage("Forum setup is not finished. Add the Supabase project details first.", true);
+      return;
+    }
+    openAuth(action === "auth-signup" ? "signup" : "login");
+  } else if (action === "logout") {
+    if (!supabase) return;
+    supabase.auth.signOut().then(({ error }) => {
+      if (error) setForumMessage(`Could not log out: ${error.message}`, true);
+    });
+  } else if (action.startsWith("compose:")) {
+    window.location.hash = `compose/${encodeURIComponent(action.slice("compose:".length))}`;
+  }
+});
+
+document.querySelectorAll("[data-close-dialog]").forEach(button => {
+  button.addEventListener("click", () => authDialog.close());
+});
+
+document.querySelector("#auth-switch").addEventListener("click", () => {
+  openAuth(authMode.value === "signup" ? "login" : "signup");
+});
+
+authForm.addEventListener("submit", async event => {
+  event.preventDefault();
+  authMessage.textContent = "";
+  const submit = document.querySelector("#auth-submit");
+  submit.disabled = true;
+  try {
+    const email = authForm.elements.email.value.trim();
+    const password = authPassword.value;
+    if (authMode.value === "signup") {
+      const username = authForm.elements.username.value.trim().toLowerCase();
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { username },
+          emailRedirectTo: window.location.origin + window.location.pathname
+        }
+      });
+      if (error) throw error;
+      if (data.session) {
+        authDialog.close();
+        await refreshForum();
+      } else {
+        authMessage.textContent = "Check your email for a confirmation link, then come back to log in.";
+      }
+    } else {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      authDialog.close();
+    }
+  } catch (error) {
+    console.error("Authentication failed:", error);
+    authMessage.textContent = error.message;
+    authMessage.classList.add("error-message");
+  } finally {
+    submit.disabled = false;
+  }
+});
+
+window.addEventListener("hashchange", handleRoute);
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  boardList.replaceChildren();
+  const row = document.createElement("tr");
+  const cell = makeElement("td", "empty-state", "Forum setup is not finished yet. Add your Supabase project details and run the database setup in SUPABASE_SETUP.md.");
+  cell.colSpan = 4;
+  row.append(cell);
+  boardList.append(row);
+  setForumMessage("No sample posts or statistics are shown. This forum will display live activity after setup.");
+} else {
+  try {
+    const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+    supabase = createClient(supabaseUrl, supabaseAnonKey);
+    const { data: { session } } = await supabase.auth.getSession();
+    updateAccount(session?.user || null);
+    supabase.auth.onAuthStateChange((_event, nextSession) => {
+      updateAccount(nextSession?.user || null);
+    });
+    await refreshForum();
+    handleRoute();
+  } catch (error) {
+    console.error("Could not initialize the forum:", error);
+    setForumMessage(`Could not connect to the forum: ${error.message}`, true);
+  }
+}
