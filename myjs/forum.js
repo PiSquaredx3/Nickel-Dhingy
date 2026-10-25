@@ -122,7 +122,6 @@ async function updateMedalCase(user) {
     const medalsByUser = await loadMemberMedals([user.id]);
     if (request !== medalCaseRequest || currentUser?.id !== user.id) return;
     const medals = medalsByUser.get(user.id) || {};
-    const showTestPreview = user.user_metadata?.username?.toLowerCase() === "pi_";
     const tiers = [
       { name: "Gold", key: "gold_count", className: "medal-icon-gold", target: "#gold-medal-tokens" },
       { name: "Silver", key: "silver_count", className: "medal-icon-silver", target: "#silver-medal-tokens" },
@@ -131,7 +130,7 @@ async function updateMedalCase(user) {
     let medalCount = 0;
 
     for (const tier of tiers) {
-      const count = showTestPreview ? 10 : medals[tier.key] || 0;
+      const count = medals[tier.key] || 0;
       medalCount += count;
       const tokens = document.querySelector(tier.target);
       tokens.replaceChildren();
