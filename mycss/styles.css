@@ -783,81 +783,40 @@ button:active {
 }
 
 .medal-shelf {
-  display: grid;
-  grid-template-columns: 46px minmax(0, 1fr);
-  align-items: end;
-  gap: 5px;
+  display: flex;
+  align-items: center;
   min-height: 31px;
   padding: 3px 3px 6px;
   border-bottom: 2px solid #596879;
   box-shadow: 0 2px #101925;
 }
 
-.medal-shelf > .medal-badge {
-  justify-self: start;
+.medal-token {
+  display: block;
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
+.medal-token {
+  flex: 0 0 16px;
+}
+
+.medal-icon-silver {
+  filter: grayscale(1) brightness(1.45) saturate(0.45);
+}
+
+.medal-icon-bronze {
+  filter: grayscale(1) sepia(1) saturate(2.2) hue-rotate(340deg) brightness(0.86);
 }
 
 .medal-shelf-tokens {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-start;
   gap: 4px;
   min-width: 0;
-}
-
-.medal-token {
-  display: grid;
-  position: relative;
-  width: 18px;
-  height: 18px;
-  flex: 0 0 18px;
-  place-items: center;
-  border: 2px double;
-  border-radius: 50%;
-  font-size: 8px;
-  font-weight: bold;
-  line-height: 1;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
-}
-
-.medal-token-gold {
-  border-color: #b18b45;
-  background: radial-gradient(circle at 35% 30%, #f4d17b, #9b722b);
-  color: #392c18;
-}
-
-.medal-token-silver {
-  border-color: #8494a8;
-  background: radial-gradient(circle at 35% 30%, #e3eaf1, #758398);
-  color: #26303b;
-}
-
-.medal-token-bronze {
-  border-color: #9c7048;
-  background: radial-gradient(circle at 35% 30%, #e6b27e, #88552f);
-  color: #38251a;
-}
-
-.medal-case-totals {
-  display: grid;
-  gap: 3px;
-  margin: 2px 0 0;
-  padding-top: 7px;
-  border-top: 1px solid #3d4b5e;
-}
-
-.medal-case-totals div {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  color: #aab7c6;
-  font-size: 10px;
-}
-
-.medal-case-totals dd {
-  margin: 0;
-  color: #e7edf3;
-  font-weight: bold;
 }
 
 .moderator-badge {

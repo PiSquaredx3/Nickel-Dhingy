@@ -17,7 +17,6 @@ const authPassword = authForm.elements.password;
 const siteTitle = document.querySelector(".site-title");
 const medalCaseStatus = document.querySelector("#medal-case-status");
 const medalShelves = document.querySelector("#medal-shelves");
-const medalCaseTotals = document.querySelector("#medal-case-totals");
 const authMode = { value: "signup" };
 let supabase;
 let currentUser;
@@ -110,7 +109,6 @@ async function updateMedalCase(user) {
   const request = ++medalCaseRequest;
   if (!user) {
     medalShelves.hidden = true;
-    medalCaseTotals.replaceChildren();
     medalCaseStatus.hidden = false;
     medalCaseStatus.textContent = "Sign in to see your medals.";
     return;
@@ -119,7 +117,6 @@ async function updateMedalCase(user) {
   medalCaseStatus.hidden = false;
   medalCaseStatus.textContent = "Loading your medals…";
   medalShelves.hidden = true;
-  medalCaseTotals.replaceChildren();
 
   try {
     const medalsByUser = await loadMemberMedals([user.id]);
@@ -127,31 +124,35 @@ async function updateMedalCase(user) {
     const medals = medalsByUser.get(user.id) || {};
     const showTestPreview = user.user_metadata?.username?.toLowerCase() === "pi_";
     const tiers = [
-      { name: "Gold", key: "gold_count", className: "medal-token-gold", target: "#gold-medal-tokens" },
-      { name: "Silver", key: "silver_count", className: "medal-token-silver", target: "#silver-medal-tokens" },
-      { name: "Bronze", key: "bronze_count", className: "medal-token-bronze", target: "#bronze-medal-tokens" }
+      { name: "Gold", key: "gold_count", className: "medal-icon-gold", target: "#gold-medal-tokens" },
+      { name: "Silver", key: "silver_count", className: "medal-icon-silver", target: "#silver-medal-tokens" },
+      { name: "Bronze", key: "bronze_count", className: "medal-icon-bronze", target: "#bronze-medal-tokens" }
     ];
+    let medalCount = 0;
 
     for (const tier of tiers) {
       const count = showTestPreview ? 10 : medals[tier.key] || 0;
+      medalCount += count;
       const tokens = document.querySelector(tier.target);
       tokens.replaceChildren();
       for (let index = 0; index < count; index += 1) {
-        const token = makeElement("span", `medal-token ${tier.className}`, tier.name[0]);
-        token.setAttribute("role", "img");
-        token.setAttribute("aria-label", `${tier.name} medal`);
+        const token = document.createElement("img");
+        token.className = `medal-token ${tier.className}`;
+        token.src = "_layouts/assets/silk-icons/star.png";
+        token.alt = `${tier.name} medal`;
         token.title = `${tier.name} medal`;
         tokens.append(token);
       }
-      const total = document.createElement("div");
-      total.append(makeElement("dt", "", tier.name), makeElement("dd", "", count.toLocaleString()));
-      medalCaseTotals.append(total);
     }
 
-    medalCaseStatus.textContent = showTestPreview
-      ? "Test preview for pi_: 10 of each medal (visual only)."
-      : "";
-    medalCaseStatus.hidden = !showTestPreview;
+    if (!medalCount) {
+      medalCaseStatus.textContent = "Your Medal Case is empty.... Post to earn some!";
+      medalCaseStatus.hidden = false;
+      medalShelves.hidden = true;
+      return;
+    }
+    medalCaseStatus.textContent = "";
+    medalCaseStatus.hidden = true;
     medalShelves.hidden = false;
   } catch (error) {
     if (request !== medalCaseRequest || currentUser?.id !== user.id) return;
