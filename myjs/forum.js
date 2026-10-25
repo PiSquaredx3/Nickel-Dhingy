@@ -7,6 +7,9 @@ const topicView = document.querySelector("#topic-view");
 const composerView = document.querySelector("#composer-view");
 const indexPanel = document.querySelector(".forum-table-wrap");
 const authDialog = document.querySelector("#auth-dialog");
+const profileDialog = document.querySelector("#profile-dialog");
+const profileForm = document.querySelector("#profile-form");
+const profileMessage = document.querySelector("#profile-message");
 const authForm = document.querySelector("#auth-form");
 const authMessage = document.querySelector("#auth-message");
 const usernameField = document.querySelector("#username-field");
@@ -43,7 +46,9 @@ function formatDate(value) {
 }
 
 function setStat(name, value) {
-  document.querySelector(`[data-stat="${name}"]`).textContent = value.toLocaleString();
+  document.querySelectorAll(`[data-stat="${name}"]`).forEach(element => {
+    element.textContent = value.toLocaleString();
+  });
 }
 
 function updateAccount(user) {
@@ -53,12 +58,41 @@ function updateAccount(user) {
 
   if (user) {
     const username = user.user_metadata?.username || "member";
-    links.append(makeElement("span", "account-name", username));
+    const profileButton = makeButton("", "profile-edit", "text-button account-name");
+    profileButton.setAttribute("aria-label", `Edit profile for ${username}`);
+    const avatar = makeElement("span", "account-avatar", username.slice(0, 1).toUpperCase());
+    profileButton.append(avatar, makeElement("span", "", username));
+    links.append(profileButton);
     links.append(makeButton("Log out", "logout", "text-button"));
+    void loadAccountAvatar(user.id, avatar);
   } else {
     links.append(makeButton("Sign up", "auth-signup", "text-button"));
     links.append(makeElement("span", "", "|"));
     links.append(makeButton("Log in", "auth-login", "text-button"));
+  }
+}
+
+async function loadAccountAvatar(userId, avatar) {
+  try {
+    const { data, error } = await supabase.from("profiles")
+      .select("avatar_url")
+      .eq("id", userId)
+      .single();
+    if (error) throw error;
+    if (currentUser?.id !== userId || !avatar.isConnected) return;
+    const avatarUrl = safeHttpsUrl(data.avatar_url);
+    if (!avatarUrl) return;
+
+    const image = document.createElement("img");
+    image.src = avatarUrl;
+    image.alt = "";
+    image.loading = "lazy";
+    image.referrerPolicy = "no-referrer";
+    image.addEventListener("error", () => image.remove(), { once: true });
+    avatar.append(image);
+  } catch (error) {
+    console.error("Could not load account profile picture:", error);
+    setForumMessage(`Could not load account profile picture: ${error.message}`, true);
   }
 }
 
@@ -152,10 +186,10 @@ async function loadStats() {
   setStat("members", members.count || 0);
   setStat("topics", topics.count || 0);
   setStat("replies", replies.count || 0);
-  const newestMember = document.querySelector("#newest-member");
-  newestMember.textContent = newest.data
+  const newestMemberText = newest.data
     ? `Newest member: ${newest.data.username} · ${formatDate(newest.data.created_at)}`
     : "No members have joined yet.";
+  document.querySelector("#newest-member").textContent = newestMemberText;
 }
 
 async function refreshForum() {
@@ -221,11 +255,50 @@ async function showBoard(slug) {
   }
 }
 
-function renderPost(author, date, body, className) {
+function safeHttpsUrl(value) {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+function renderPost(profile, date, body, className) {
   const post = makeElement("article", `forum-post ${className}`);
+  const author = profile?.username || "member";
+  const authorPanel = makeElement("aside", "post-author");
+  const avatar = makeElement("div", "post-avatar", author.slice(0, 1).toUpperCase());
+  const avatarUrl = safeHttpsUrl(profile?.avatar_url);
+  if (avatarUrl) {
+    const image = document.createElement("img");
+    image.src = avatarUrl;
+    image.alt = `${author}'s profile picture`;
+    image.loading = "lazy";
+    image.referrerPolicy = "no-referrer";
+    image.addEventListener("error", () => image.remove(), { once: true });
+    avatar.append(image);
+  }
+  authorPanel.append(avatar, makeElement("strong", "post-author-name", author));
+
+  const profileLink = safeHttpsUrl(profile?.profile_link);
+  if (profileLink) {
+    const link = makeElement("a", "post-profile-link", "Personal Page");
+    link.href = profileLink;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    authorPanel.append(link);
+  }
+  if (profile?.signature) {
+    authorPanel.append(makeElement("p", "post-signature", profile.signature));
+  }
+
+  const content = makeElement("div", "post-content");
   const header = makeElement("div", "post-header");
-  header.append(makeElement("strong", "", author || "member"), makeElement("time", "", formatDate(date)));
-  post.append(header, makeElement("p", "post-body", body));
+  header.append(makeElement("time", "", formatDate(date)));
+  content.append(header, makeElement("p", "post-body", body));
+  post.append(authorPanel, content);
   return post;
 }
 
@@ -239,11 +312,11 @@ async function showTopic(id) {
   try {
     const [{ data: topic, error: topicError }, { data: replies, error: replyError }] = await Promise.all([
       supabase.from("topics")
-        .select("id,board_id,title,body,created_at,profiles!topics_author_id_fkey(username)")
+        .select("id,board_id,title,body,created_at,profiles!topics_author_id_fkey(username,avatar_url,signature,profile_link)")
         .eq("id", id)
         .maybeSingle(),
       supabase.from("replies")
-        .select("id,body,created_at,profiles!replies_author_id_fkey(username)")
+        .select("id,body,created_at,profiles!replies_author_id_fkey(username,avatar_url,signature,profile_link)")
         .eq("topic_id", id)
         .order("created_at")
     ]);
@@ -255,9 +328,9 @@ async function showTopic(id) {
     topicView.replaceChildren();
     appendBackLink(topicView, `← ${board?.title || "Forum index"}`);
     topicView.append(makeElement("h2", "view-title", topic.title));
-    topicView.append(renderPost(topic.profiles?.username, topic.created_at, topic.body, "topic-first-post"));
+    topicView.append(renderPost(topic.profiles, topic.created_at, topic.body, "topic-first-post"));
     for (const reply of replies) {
-      topicView.append(renderPost(reply.profiles?.username, reply.created_at, reply.body, "topic-reply"));
+      topicView.append(renderPost(reply.profiles, reply.created_at, reply.body, "topic-reply"));
     }
 
     if (currentUser) {
@@ -403,6 +476,94 @@ function openAuth(mode) {
   authDialog.showModal();
 }
 
+async function openProfile() {
+  if (!currentUser) return;
+  profileForm.reset();
+  profileMessage.textContent = "Loading your profile…";
+  profileMessage.classList.remove("error-message");
+  const saveButton = document.querySelector("#profile-save");
+  saveButton.disabled = true;
+  profileDialog.showModal();
+  try {
+    const { data, error } = await supabase.from("profiles")
+      .select("avatar_url,signature,profile_link")
+      .eq("id", currentUser.id)
+      .single();
+    if (error) throw error;
+    profileForm.elements.avatar_url.value = data.avatar_url || "";
+    profileForm.elements.signature.value = data.signature || "";
+    profileForm.elements.profile_link.value = data.profile_link || "";
+    profileMessage.textContent = "";
+  } catch (error) {
+    console.error("Could not load profile:", error);
+    profileMessage.textContent = `Could not load profile: ${error.message}`;
+    profileMessage.classList.add("error-message");
+  } finally {
+    saveButton.disabled = false;
+  }
+}
+
+profileForm.addEventListener("submit", async event => {
+  event.preventDefault();
+  if (!currentUser) return;
+  profileMessage.textContent = "";
+  profileMessage.classList.remove("error-message");
+  const saveButton = document.querySelector("#profile-save");
+  saveButton.disabled = true;
+  try {
+    const avatarFile = profileForm.elements.avatar_file.files[0];
+    const avatarInput = profileForm.elements.avatar_url.value.trim();
+    const linkInput = profileForm.elements.profile_link.value.trim();
+    const profileLink = safeHttpsUrl(linkInput);
+    if (linkInput && !profileLink) throw new Error("Profile link must be a valid https:// link.");
+
+    let avatarUrl = null;
+    if (avatarFile) {
+      const allowedTypes = ["image/jpeg", "image/gif"];
+      if (!allowedTypes.includes(avatarFile.type)) {
+        throw new Error("Choose a JPG or GIF image file.");
+      }
+      if (avatarFile.size > 2 * 1024 * 1024) {
+        throw new Error("Profile picture files must be 2 MB or smaller.");
+      }
+
+      profileMessage.textContent = "Uploading profile picture…";
+      const { error: uploadError } = await supabase.storage
+        .from("profile-avatars")
+        .upload(`${currentUser.id}/avatar`, avatarFile, {
+          cacheControl: "0",
+          contentType: avatarFile.type,
+          upsert: true
+        });
+      if (uploadError) throw uploadError;
+      avatarUrl = supabase.storage.from("profile-avatars")
+        .getPublicUrl(`${currentUser.id}/avatar`).data.publicUrl;
+    } else {
+      avatarUrl = safeHttpsUrl(avatarInput);
+      if (avatarInput && !avatarUrl) {
+        throw new Error("Profile picture URL must be a valid https:// link.");
+      }
+    }
+
+    profileMessage.textContent = "Saving profile…";
+    const { error } = await supabase.from("profiles").update({
+      avatar_url: avatarUrl,
+      signature: profileForm.elements.signature.value.trim() || null,
+      profile_link: profileLink
+    }).eq("id", currentUser.id);
+    if (error) throw error;
+    updateAccount(currentUser);
+    profileDialog.close();
+    handleRoute();
+  } catch (error) {
+    console.error("Could not save profile:", error);
+    profileMessage.textContent = error.message;
+    profileMessage.classList.add("error-message");
+  } finally {
+    saveButton.disabled = false;
+  }
+});
+
 document.addEventListener("click", event => {
   const authButton = event.target.closest("[data-auth]");
   if (authButton) {
@@ -422,6 +583,9 @@ document.addEventListener("click", event => {
       return;
     }
     openAuth(action === "auth-signup" ? "signup" : "login");
+  } else if (action === "profile-edit") {
+    if (!supabase) return;
+    openProfile();
   } else if (action === "logout") {
     if (!supabase) return;
     supabase.auth.signOut().then(({ error }) => {
@@ -435,6 +599,8 @@ document.addEventListener("click", event => {
 document.querySelectorAll("[data-close-dialog]").forEach(button => {
   button.addEventListener("click", () => authDialog.close());
 });
+
+document.querySelector("[data-close-profile]").addEventListener("click", () => profileDialog.close());
 
 document.querySelector("#auth-switch").addEventListener("click", () => {
   openAuth(authMode.value === "signup" ? "login" : "signup");
@@ -489,6 +655,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
   row.append(cell);
   boardList.append(row);
   setForumMessage("No sample posts or statistics are shown. This forum will display live activity after setup.");
+  handleRoute();
 } else {
   try {
     const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");

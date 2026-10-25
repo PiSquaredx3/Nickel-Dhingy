@@ -1,9 +1,30 @@
 create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   username text not null unique,
+  avatar_url text,
+  signature text,
+  profile_link text,
   created_at timestamptz not null default now(),
   constraint profiles_username_format check (username ~ '^[A-Za-z0-9_]{3,24}$')
 );
+
+alter table public.profiles
+  add column if not exists avatar_url text,
+  add column if not exists signature text,
+  add column if not exists profile_link text;
+
+alter table public.profiles
+  drop constraint if exists profiles_avatar_url_https,
+  drop constraint if exists profiles_signature_length,
+  drop constraint if exists profiles_profile_link_https;
+
+alter table public.profiles
+  add constraint profiles_avatar_url_https
+    check (avatar_url is null or (char_length(avatar_url) <= 500 and avatar_url ~* '^https://')),
+  add constraint profiles_signature_length
+    check (signature is null or char_length(signature) <= 240),
+  add constraint profiles_profile_link_https
+    check (profile_link is null or (char_length(profile_link) <= 500 and profile_link ~* '^https://'));
 
 create unique index if not exists profiles_username_case_insensitive
   on public.profiles (lower(username));
@@ -19,6 +40,47 @@ create table if not exists public.boards (
 alter table public.boards
   drop column if exists description,
   drop column if exists icon;
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'profile-avatars',
+  'profile-avatars',
+  true,
+  2097152,
+  array['image/jpeg', 'image/gif']
+)
+on conflict (id) do update set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists "Members can read their own avatar files" on storage.objects;
+create policy "Members can read their own avatar files"
+  on storage.objects for select to authenticated
+  using (
+    bucket_id = 'profile-avatars'
+    and (storage.foldername(name))[1] = (select auth.uid())::text
+  );
+
+drop policy if exists "Members can upload their own avatar files" on storage.objects;
+create policy "Members can upload their own avatar files"
+  on storage.objects for insert to authenticated
+  with check (
+    bucket_id = 'profile-avatars'
+    and (storage.foldername(name))[1] = (select auth.uid())::text
+  );
+
+drop policy if exists "Members can update their own avatar files" on storage.objects;
+create policy "Members can update their own avatar files"
+  on storage.objects for update to authenticated
+  using (
+    bucket_id = 'profile-avatars'
+    and (storage.foldername(name))[1] = (select auth.uid())::text
+  )
+  with check (
+    bucket_id = 'profile-avatars'
+    and (storage.foldername(name))[1] = (select auth.uid())::text
+  );
 
 create table if not exists public.topics (
   id uuid primary key default gen_random_uuid(),

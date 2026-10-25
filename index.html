@@ -21,11 +21,8 @@
           <button type="button" class="text-button" data-auth="login">Log in</button>
         </div>
       </div>
-      <p class="tagline">Your corner of the web since 1999.</p>
       <nav class="main-nav" aria-label="Main navigation">
-        <a class="active" href="#forums">Forum Index</a>
-        <a href="#community">Community</a>
-        <a href="#guidelines">Guidelines</a>
+        <a class="active" href="#forums">Forums</a>
       </nav>
     </header>
 
@@ -60,7 +57,7 @@
         </section>
 
         <aside class="sidebar">
-          <section id="community" class="side-panel">
+          <section class="side-panel">
             <h2>Community Stats</h2>
             <dl class="stats-list">
               <div><dt>Members</dt><dd data-stat="members">—</dd></div>
@@ -70,7 +67,7 @@
             <p class="online-note" id="newest-member">Member activity will appear here.</p>
           </section>
 
-          <section id="guidelines" class="side-panel">
+          <section class="side-panel">
             <h2>Community Guidelines</h2>
             <p class="panel-copy">Be Nice and don't start just sending pirated games... I'm not Vimm's Lair or your personal NAS.</p>
             <p class="panel-copy">Need help with your account? Contact the site administrator.</p>
@@ -83,11 +80,12 @@
           </section>
         </aside>
       </div>
+
     </main>
 
     <footer class="site-footer">
       <div><strong>Nickel-Dhingy.com</strong><span> i'm... i'm not a creative writer.</span></div>
-      <div><a href="#top">Back to top ↑</a><span class="footer-divider">|</span><a href="#guidelines">Community guidelines</a></div>
+      <div><a href="#top">Back to top ↑</a></div>
       <p>Be kind to each other, please</p>
     </footer>
   </div>
@@ -115,6 +113,38 @@
       <p id="auth-message" class="form-message" role="status"></p>
       <button id="auth-submit" type="submit" class="primary-button">Create account</button>
       <button type="button" id="auth-switch" class="text-button switch-button">Already a member? Log in</button>
+    </form>
+  </dialog>
+
+  <dialog id="profile-dialog" class="site-dialog">
+    <form id="profile-form" class="dialog-card">
+      <div class="dialog-heading">
+        <h2>Your forum profile</h2>
+        <button type="button" class="close-button" data-close-profile aria-label="Close">×</button>
+      </div>
+      <p class="dialog-copy">These details appear beside your messages.</p>
+      <label class="form-field">
+        Profile picture URL
+        <input name="avatar_url" type="url" maxlength="500" placeholder="https://example.com/avatar.jpg" autocomplete="url" />
+        <small>Use a direct HTTPS image link, or upload a JPG or GIF below. Leave both blank for initials.</small>
+      </label>
+      <label class="form-field">
+        Upload profile picture
+        <input name="avatar_file" type="file" accept=".jpg,.jpeg,.gif,image/jpeg,image/gif" />
+        <small>JPG or GIF, up to 2 MB. An uploaded file takes priority over the URL above.</small>
+      </label>
+      <label class="form-field">
+        Signature
+        <textarea name="signature" maxlength="240" rows="3" placeholder="A short line shown under your messages"></textarea>
+        <small>Up to 240 characters.</small>
+      </label>
+      <label class="form-field">
+        Personal Page
+        <input name="profile_link" type="url" maxlength="500" placeholder="https://example.com/your-page" autocomplete="url" />
+        <small>Share your personal website, YouTube channel, Steam profile, or another page (https:// link).</small>
+      </label>
+      <p id="profile-message" class="form-message" role="status"></p>
+      <button id="profile-save" type="submit" class="primary-button">Save profile</button>
     </form>
   </dialog>
 </body>
