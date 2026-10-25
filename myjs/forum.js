@@ -618,7 +618,17 @@ document.addEventListener("click", event => {
   const actionButton = event.target.closest("[data-action]");
   if (!actionButton) return;
   const action = actionButton.dataset.action;
-  if (action === "auth-signup" || action === "auth-login") {
+  if (action === "make-post") {
+    if (!supabase) {
+      setForumMessage("Forum setup is not finished. Add the Supabase project details first.", true);
+      return;
+    }
+    if (currentUser) {
+      window.location.hash = "compose/off-topic";
+    } else {
+      openAuth("signup");
+    }
+  } else if (action === "auth-signup" || action === "auth-login") {
     if (!supabase) {
       setForumMessage("Forum setup is not finished. Add the Supabase project details first.", true);
       return;
