@@ -52,23 +52,25 @@
           <section class="side-panel" aria-labelledby="medal-case-title">
             <h2 id="medal-case-title">Medal Case</h2>
             <div class="medal-case">
-              <p class="medal-case-intro">Earned through steady participation</p>
-              <ul class="medal-legend" aria-label="Medal requirements">
-                <li>
-                  <span class="medal-badge medal-bronze">Bronze</span>
-                  <span>5 posts · 3 active days · 7-day-old account</span>
-                </li>
-                <li>
-                  <span class="medal-badge medal-silver">Silver</span>
-                  <span>20 posts · 10 active days · 30-day-old account</span>
-                </li>
-                <li>
+              <p id="medal-case-status" class="medal-case-status" role="status">Sign in to see your medals.</p>
+              <div id="medal-shelves" class="medal-shelves" hidden>
+                <div class="medal-shelf" role="group" aria-label="Gold medals">
                   <span class="medal-badge medal-gold">Gold</span>
-                  <span>50 posts · 30 active days · 90-day-old account</span>
-                </li>
-              </ul>
+                  <div id="gold-medal-tokens" class="medal-shelf-tokens"></div>
+                </div>
+                <div class="medal-shelf" role="group" aria-label="Silver medals">
+                  <span class="medal-badge medal-silver">Silver</span>
+                  <div id="silver-medal-tokens" class="medal-shelf-tokens"></div>
+                </div>
+                <div class="medal-shelf" role="group" aria-label="Bronze medals">
+                  <span class="medal-badge medal-bronze">Bronze</span>
+                  <div id="bronze-medal-tokens" class="medal-shelf-tokens"></div>
+                </div>
+                <dl id="medal-case-totals" class="medal-case-totals"></dl>
+              </div>
             </div>
           </section>
+
         </aside>
 
         <section id="forums" class="forum-column" aria-labelledby="forums-title">

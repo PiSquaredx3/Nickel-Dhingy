@@ -757,36 +757,107 @@ button:active {
 }
 
 .medal-case {
-  padding: 8px;
+  padding: 7px;
   border: 1px solid #58677a;
-  background: #172334;
+  background: linear-gradient(#1b283a, #172334);
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.06);
 }
 
-.medal-case-intro {
-  margin: 0 0 7px;
+.medal-case-status {
+  margin: 0;
   color: #aab7c6;
   font-size: 10px;
 }
 
-.medal-legend {
+.medal-case-status:empty {
+  display: none;
+}
+
+.medal-shelves {
   display: grid;
   gap: 7px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
 }
 
-.medal-legend li {
+.medal-shelves[hidden] {
+  display: none;
+}
+
+.medal-shelf {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  align-items: end;
+  gap: 5px;
+  min-height: 31px;
+  padding: 3px 3px 6px;
+  border-bottom: 2px solid #596879;
+  box-shadow: 0 2px #101925;
+}
+
+.medal-shelf > .medal-badge {
+  justify-self: start;
+}
+
+.medal-shelf-tokens {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.medal-token {
+  display: grid;
+  position: relative;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  place-items: center;
+  border: 2px double;
+  border-radius: 50%;
+  font-size: 8px;
+  font-weight: bold;
+  line-height: 1;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
+.medal-token-gold {
+  border-color: #b18b45;
+  background: radial-gradient(circle at 35% 30%, #f4d17b, #9b722b);
+  color: #392c18;
+}
+
+.medal-token-silver {
+  border-color: #8494a8;
+  background: radial-gradient(circle at 35% 30%, #e3eaf1, #758398);
+  color: #26303b;
+}
+
+.medal-token-bronze {
+  border-color: #9c7048;
+  background: radial-gradient(circle at 35% 30%, #e6b27e, #88552f);
+  color: #38251a;
+}
+
+.medal-case-totals {
   display: grid;
   gap: 3px;
-  color: #bdc7d3;
-  font-size: 9px;
-  line-height: 1.4;
+  margin: 2px 0 0;
+  padding-top: 7px;
+  border-top: 1px solid #3d4b5e;
 }
 
-.medal-legend .medal-badge {
-  justify-self: start;
+.medal-case-totals div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: #aab7c6;
+  font-size: 10px;
+}
+
+.medal-case-totals dd {
+  margin: 0;
+  color: #e7edf3;
+  font-weight: bold;
 }
 
 .moderator-badge {
@@ -894,6 +965,8 @@ button:active {
 
 .post-header {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 7px 10px;
@@ -901,6 +974,17 @@ button:active {
   background: linear-gradient(#34445a, #29384c);
   color: #8dd7f2;
   font-size: 10px;
+}
+
+.post-award-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-right: auto;
+}
+
+.post-vote {
+  white-space: nowrap;
 }
 
 .moderation-delete {

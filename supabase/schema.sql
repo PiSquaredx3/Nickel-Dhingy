@@ -193,9 +193,173 @@ group by p.id, p.created_at;
 
 grant select on public.member_activity to anon, authenticated;
 
+create table if not exists public.post_votes (
+  id uuid primary key default gen_random_uuid(),
+  topic_id uuid references public.topics (id) on delete cascade,
+  reply_id uuid references public.replies (id) on delete cascade,
+  voter_id uuid not null references public.profiles (id) on delete cascade,
+  is_moderator boolean not null default false,
+  is_pi boolean not null default false,
+  created_at timestamptz not null default now(),
+  constraint post_votes_one_target check (num_nonnulls(topic_id, reply_id) = 1)
+);
+
+create unique index if not exists post_votes_topic_voter
+  on public.post_votes (topic_id, voter_id)
+  where topic_id is not null;
+create unique index if not exists post_votes_reply_voter
+  on public.post_votes (reply_id, voter_id)
+  where reply_id is not null;
+create index if not exists post_votes_voter_created_at
+  on public.post_votes (voter_id, created_at desc);
+
+alter table public.post_votes enable row level security;
+
+drop policy if exists "Post votes are publicly readable" on public.post_votes;
+create policy "Post votes are publicly readable"
+  on public.post_votes for select
+  using (true);
+
+create or replace view public.post_awards
+with (security_invoker = true)
+as
+with posts as (
+  select 'topic'::text as post_type, id as post_id, author_id
+  from public.topics
+  union all
+  select 'reply'::text as post_type, id as post_id, author_id
+  from public.replies
+),
+vote_summary as (
+  select
+    case when topic_id is not null then 'topic' else 'reply' end::text as post_type,
+    coalesce(topic_id, reply_id) as post_id,
+    count(*)::integer as vote_count,
+    coalesce(bool_or(voter_id = (select auth.uid())), false) as voted_by_user,
+    coalesce(bool_or(is_moderator), false) as moderator_awarded,
+    coalesce(bool_or(is_pi), false) as pi_awarded
+  from public.post_votes
+  group by 1, 2
+)
+select
+  p.post_type,
+  p.post_id,
+  p.author_id,
+  coalesce(v.vote_count, 0)::integer as vote_count,
+  coalesce(v.voted_by_user, false) as voted_by_user,
+  (coalesce(v.vote_count, 0) >= 10 or coalesce(v.moderator_awarded, false)) as bronze_awarded,
+  coalesce(v.moderator_awarded, false) as silver_awarded,
+  coalesce(v.pi_awarded, false) as gold_awarded
+from posts p
+left join vote_summary v using (post_type, post_id);
+
+create or replace view public.member_medals
+with (security_invoker = true)
+as
+select
+  author_id as user_id,
+  count(*) filter (where bronze_awarded)::integer as bronze_count,
+  count(*) filter (where silver_awarded)::integer as silver_count,
+  count(*) filter (where gold_awarded)::integer as gold_count
+from public.post_awards
+group by author_id;
+
+create or replace function public.cast_post_vote(p_topic_id uuid default null, p_reply_id uuid default null)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  voter_user_id uuid := auth.uid();
+  target_author_id uuid;
+  account_created_at timestamptz;
+  vote_day_start timestamptz;
+  daily_vote_count integer;
+  voter_is_moderator boolean;
+  voter_is_pi boolean;
+begin
+  if voter_user_id is null then
+    raise exception 'Sign in to vote on a post.';
+  end if;
+
+  if (p_topic_id is null) = (p_reply_id is null) then
+    raise exception 'Choose exactly one post to vote on.';
+  end if;
+
+  perform pg_advisory_xact_lock(hashtextextended(voter_user_id::text, 0));
+
+  if p_topic_id is not null then
+    select author_id into target_author_id
+    from public.topics
+    where id = p_topic_id;
+  else
+    select author_id into target_author_id
+    from public.replies
+    where id = p_reply_id;
+  end if;
+
+  if target_author_id is null then
+    raise exception 'This post no longer exists.';
+  end if;
+
+  if target_author_id = voter_user_id then
+    raise exception 'You cannot vote on your own post.';
+  end if;
+
+  if p_topic_id is not null and exists (
+    select 1 from public.post_votes
+    where topic_id = p_topic_id and voter_id = voter_user_id
+  ) then
+    raise exception 'You have already voted on this post.';
+  elsif p_reply_id is not null and exists (
+    select 1 from public.post_votes
+    where reply_id = p_reply_id and voter_id = voter_user_id
+  ) then
+    raise exception 'You have already voted on this post.';
+  end if;
+
+  select created_at into account_created_at
+  from public.profiles
+  where id = voter_user_id;
+
+  if account_created_at is null or account_created_at > now() - interval '14 days' then
+    raise exception 'Your account must be at least 14 days old to vote.';
+  end if;
+
+  vote_day_start := date_trunc('day', now() at time zone 'UTC') at time zone 'UTC';
+  select count(*)::integer into daily_vote_count
+  from public.post_votes
+  where voter_id = voter_user_id and created_at >= vote_day_start;
+
+  if daily_vote_count >= 3 then
+    raise exception 'You have reached the limit of 3 votes for today.';
+  end if;
+
+  select exists (
+    select 1 from public.moderators where user_id = voter_user_id
+  ) into voter_is_moderator;
+
+  select exists (
+    select 1 from public.profiles where id = voter_user_id and username = 'pi_'
+  ) into voter_is_pi;
+
+  insert into public.post_votes (topic_id, reply_id, voter_id, is_moderator, is_pi)
+  values (p_topic_id, p_reply_id, voter_user_id, voter_is_moderator, voter_is_pi);
+end;
+$$;
+
+revoke all on public.post_votes from public, anon, authenticated;
+grant select on public.post_votes to anon, authenticated;
+revoke all on function public.cast_post_vote(uuid, uuid) from public, anon, authenticated;
+grant execute on function public.cast_post_vote(uuid, uuid) to authenticated;
+grant select on public.post_awards, public.member_medals to anon, authenticated;
+
 update public.boards
-set position = position + 1000
-where slug = 'sega-other-classics';
+set position = position + (
+  select coalesce(max(position), 0) - coalesce(min(position), 0) + 1
+  from public.boards
+);
 
 delete from public.boards
 where slug = 'modern-games';
@@ -220,7 +384,7 @@ values
   ('music', 'Music Discussion', 'NON-GAMING BOARDS', 12),
   ('movies-tv', 'Movies & TV', 'NON-GAMING BOARDS', 13),
   ('hobbies-projects', 'Hobbies & Projects', 'NON-GAMING BOARDS', 14),
-  ('food-drink', 'Food & Drink', 'NON-GAMING BOARDS', 15),
+  ('art-projects', 'Art & Art Adjacent', 'NON-GAMING BOARDS', 15),
   ('books-comics', 'Books & Comics', 'NON-GAMING BOARDS', 16),
   ('rathner', 'Airmen Rathners Personal Poop Board', 'NON-GAMING BOARDS', 99)
 on conflict (slug) do update set

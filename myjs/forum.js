@@ -15,11 +15,15 @@ const authMessage = document.querySelector("#auth-message");
 const usernameField = document.querySelector("#username-field");
 const authPassword = authForm.elements.password;
 const siteTitle = document.querySelector(".site-title");
+const medalCaseStatus = document.querySelector("#medal-case-status");
+const medalShelves = document.querySelector("#medal-shelves");
+const medalCaseTotals = document.querySelector("#medal-case-totals");
 const authMode = { value: "signup" };
 let supabase;
 let currentUser;
 let boards = [];
 let moderatorIds = new Set();
+let medalCaseRequest = 0;
 
 const siteTitles = [
   "Another Retro Gaming Larping Forum",
@@ -86,13 +90,87 @@ async function loadMemberActivity(userIds) {
   const ids = [...new Set(userIds.filter(Boolean))];
   if (!ids.length) return new Map();
   const { data, error } = await supabase.from("member_activity")
-    .select("user_id,joined_at,post_count,active_days")
+    .select("user_id,joined_at")
     .in("user_id", ids);
   if (error) throw error;
   return new Map(data.map(activity => [activity.user_id, activity]));
 }
 
-function appendMemberLabels(container, userId, activity) {
+async function loadMemberMedals(userIds) {
+  const ids = [...new Set(userIds.filter(Boolean))];
+  if (!ids.length) return new Map();
+  const { data, error } = await supabase.from("member_medals")
+    .select("user_id,bronze_count,silver_count,gold_count")
+    .in("user_id", ids);
+  if (error) throw error;
+  return new Map(data.map(medals => [medals.user_id, medals]));
+}
+
+async function updateMedalCase(user) {
+  const request = ++medalCaseRequest;
+  if (!user) {
+    medalShelves.hidden = true;
+    medalCaseTotals.replaceChildren();
+    medalCaseStatus.hidden = false;
+    medalCaseStatus.textContent = "Sign in to see your medals.";
+    return;
+  }
+
+  medalCaseStatus.hidden = false;
+  medalCaseStatus.textContent = "Loading your medals…";
+  medalShelves.hidden = true;
+  medalCaseTotals.replaceChildren();
+
+  try {
+    const medalsByUser = await loadMemberMedals([user.id]);
+    if (request !== medalCaseRequest || currentUser?.id !== user.id) return;
+    const medals = medalsByUser.get(user.id) || {};
+    const showTestPreview = user.user_metadata?.username?.toLowerCase() === "pi_";
+    const tiers = [
+      { name: "Gold", key: "gold_count", className: "medal-token-gold", target: "#gold-medal-tokens" },
+      { name: "Silver", key: "silver_count", className: "medal-token-silver", target: "#silver-medal-tokens" },
+      { name: "Bronze", key: "bronze_count", className: "medal-token-bronze", target: "#bronze-medal-tokens" }
+    ];
+
+    for (const tier of tiers) {
+      const count = showTestPreview ? 10 : medals[tier.key] || 0;
+      const tokens = document.querySelector(tier.target);
+      tokens.replaceChildren();
+      for (let index = 0; index < count; index += 1) {
+        const token = makeElement("span", `medal-token ${tier.className}`, tier.name[0]);
+        token.setAttribute("role", "img");
+        token.setAttribute("aria-label", `${tier.name} medal`);
+        token.title = `${tier.name} medal`;
+        tokens.append(token);
+      }
+      const total = document.createElement("div");
+      total.append(makeElement("dt", "", tier.name), makeElement("dd", "", count.toLocaleString()));
+      medalCaseTotals.append(total);
+    }
+
+    medalCaseStatus.textContent = showTestPreview
+      ? "Test preview for pi_: 10 of each medal (visual only)."
+      : "";
+    medalCaseStatus.hidden = !showTestPreview;
+    medalShelves.hidden = false;
+  } catch (error) {
+    if (request !== medalCaseRequest || currentUser?.id !== user.id) return;
+    console.error("Could not load your medal case:", error);
+    medalCaseStatus.textContent = `Could not load your medals: ${error.message}`;
+  }
+}
+
+async function loadPostAwards(postType, postIds) {
+  if (!postIds.length) return new Map();
+  const { data, error } = await supabase.from("post_awards")
+    .select("post_type,post_id,author_id,vote_count,voted_by_user,bronze_awarded,silver_awarded,gold_awarded")
+    .eq("post_type", postType)
+    .in("post_id", postIds);
+  if (error) throw error;
+  return new Map(data.map(award => [`${award.post_type}:${award.post_id}`, award]));
+}
+
+function appendMemberLabels(container, userId, medals) {
   const labels = makeElement("span", "member-labels");
   let hasLabels = false;
   if (moderatorIds.has(userId)) {
@@ -100,38 +178,32 @@ function appendMemberLabels(container, userId, activity) {
     hasLabels = true;
   }
 
-  if (activity) {
-    const ageDays = (Date.now() - new Date(activity.joined_at).getTime()) / 86400000;
-    const medals = [
-      {
-        name: "Bronze",
-        className: "medal-bronze",
-        earned: activity.post_count >= 5 && activity.active_days >= 3 && ageDays >= 7,
-        description: "5 posts across 3 active days; account is at least 7 days old"
-      },
-      {
-        name: "Silver",
-        className: "medal-silver",
-        earned: activity.post_count >= 20 && activity.active_days >= 10 && ageDays >= 30,
-        description: "20 posts across 10 active days; account is at least 30 days old"
-      },
-      {
-        name: "Gold",
-        className: "medal-gold",
-        earned: activity.post_count >= 50 && activity.active_days >= 30 && ageDays >= 90,
-        description: "50 posts across 30 active days; account is at least 90 days old"
-      }
-    ];
-    for (const medal of medals) {
-      if (!medal.earned) continue;
-      const badge = makeElement("span", `medal-badge ${medal.className}`, medal.name);
-      badge.title = medal.description;
-      labels.append(badge);
-      hasLabels = true;
-    }
+  for (const [name, className, count] of [
+    ["Bronze", "medal-bronze", medals?.bronze_count],
+    ["Silver", "medal-silver", medals?.silver_count],
+    ["Gold", "medal-gold", medals?.gold_count]
+  ]) {
+    if (!count) continue;
+    const badge = makeElement("span", `medal-badge ${className}`, `${name} ×${count}`);
+    badge.title = `${count} post${count === 1 ? "" : "s"} earned this medal`;
+    labels.append(badge);
+    hasLabels = true;
   }
 
   if (hasLabels) container.append(labels);
+}
+
+function appendPostAwardBadges(container, award) {
+  if (!award) return;
+  const badges = makeElement("span", "post-award-badges");
+  for (const [name, className, earned] of [
+    ["Bronze", "medal-bronze", award.bronze_awarded],
+    ["Silver", "medal-silver", award.silver_awarded],
+    ["Gold", "medal-gold", award.gold_awarded]
+  ]) {
+    if (earned) badges.append(makeElement("span", `medal-badge ${className}`, name));
+  }
+  if (badges.childElementCount) container.append(badges);
 }
 
 function setStat(name, value) {
@@ -142,6 +214,7 @@ function setStat(name, value) {
 
 function updateAccount(user) {
   currentUser = user;
+  void updateMedalCase(user);
   const links = document.querySelector("#account-links");
   links.replaceChildren();
 
@@ -290,7 +363,8 @@ async function loadLatestDiscussions() {
     .order("updated_at", { ascending: false })
     .limit(5);
   if (error) throw error;
-  const activityByUser = await loadMemberActivity(data.map(topic => topic.profiles?.id));
+  const authorIds = data.map(topic => topic.profiles?.id);
+  const medalsByUser = await loadMemberMedals(authorIds);
 
   const list = document.querySelector("#latest-discussions");
   list.replaceChildren();
@@ -307,7 +381,7 @@ async function loadLatestDiscussions() {
       link,
       makeElement("span", "latest-topic-meta", `${topic.boards?.title || "Forum"} · ${topic.profiles?.username || "member"}`)
     );
-    appendMemberLabels(item, topic.profiles?.id, activityByUser.get(topic.profiles?.id));
+    appendMemberLabels(item, topic.profiles?.id, medalsByUser.get(topic.profiles?.id));
     list.append(item);
   }
 }
@@ -359,7 +433,8 @@ async function showBoard(slug) {
       .order("updated_at", { ascending: false })
       .range(0, 49);
     if (error) throw error;
-    const activityByUser = await loadMemberActivity(data.map(topic => topic.profiles?.id));
+    const authorIds = data.map(topic => topic.profiles?.id);
+    const medalsByUser = await loadMemberMedals(authorIds);
     list.replaceChildren();
     if (!data.length) {
       list.append(makeElement("p", "empty-state", "No topics here yet. Start the first conversation."));
@@ -390,7 +465,7 @@ async function showBoard(slug) {
         makeElement("p", "topic-meta", `${topic.profiles?.username || "member"} · ${formatDate(topic.updated_at)} · ${replyCount} replies`),
         makeElement("p", "topic-preview", topic.body)
       );
-      appendMemberLabels(details, topic.profiles?.id, activityByUser.get(topic.profiles?.id));
+      appendMemberLabels(details, topic.profiles?.id, medalsByUser.get(topic.profiles?.id));
       item.append(details);
       list.append(item);
     }
@@ -410,7 +485,7 @@ function safeHttpsUrl(value) {
   }
 }
 
-function renderPost(profile, date, body, className, imageUrl = null, activity = null, moderationAction = null) {
+function renderPost(profile, date, body, className, imageUrl = null, activity = null, moderationAction = null, medals = null, award = null, postType = null, postId = null) {
   const post = makeElement("article", `forum-post ${className}`);
   const author = profile?.username || "member";
   const authorPanel = makeElement("aside", "post-author");
@@ -431,7 +506,7 @@ function renderPost(profile, date, body, className, imageUrl = null, activity = 
     avatar.append(image);
   }
   authorPanel.append(avatar, makeElement("strong", "post-author-name", author));
-  appendMemberLabels(authorPanel, profile?.id, activity);
+  appendMemberLabels(authorPanel, profile?.id, medals);
 
   const profileLink = safeHttpsUrl(profile?.profile_link);
   if (profileLink) {
@@ -448,6 +523,19 @@ function renderPost(profile, date, body, className, imageUrl = null, activity = 
   const content = makeElement("div", "post-content");
   const header = makeElement("div", "post-header");
   header.append(makeElement("time", "", formatDate(date)));
+  appendPostAwardBadges(header, award);
+  if (award && postType && postId) {
+    const voteButton = makeButton(
+      award.voted_by_user ? `Voted · ${award.vote_count}` : `Vote · ${award.vote_count}`,
+      `vote:${postType}:${postId}`,
+      "small-button post-vote"
+    );
+    if (award.voted_by_user || profile?.id === currentUser?.id) {
+      voteButton.disabled = true;
+      if (profile?.id === currentUser?.id) voteButton.title = "You cannot vote on your own post.";
+    }
+    header.append(voteButton);
+  }
   if (moderationAction && moderatorIds.has(currentUser?.id)) {
     const deleteButton = makeButton("Delete", moderationAction, "small-button moderation-delete");
     deleteButton.title = "Remove this post";
@@ -492,7 +580,14 @@ async function showTopic(id) {
     if (!topic) throw new Error("This topic no longer exists.");
 
     const profiles = [topic.profiles, ...replies.map(reply => reply.profiles)];
-    const activityByUser = await loadMemberActivity(profiles.map(profile => profile?.id));
+    const profileIds = profiles.map(profile => profile?.id);
+    const replyIds = replies.map(reply => reply.id);
+    const [activityByUser, medalsByUser, topicAwards, replyAwards] = await Promise.all([
+      loadMemberActivity(profileIds),
+      loadMemberMedals(profileIds),
+      loadPostAwards("topic", [topic.id]),
+      loadPostAwards("reply", replyIds)
+    ]);
     const board = boards.find(item => item.id === topic.board_id);
     topicView.replaceChildren();
     appendBackLink(topicView, `← ${board?.title || "Forum index"}`);
@@ -504,7 +599,11 @@ async function showTopic(id) {
       "topic-first-post",
       topic.image_url,
       activityByUser.get(topic.profiles?.id),
-      `moderate-delete-topic:${topic.id}`
+      `moderate-delete-topic:${topic.id}`,
+      medalsByUser.get(topic.profiles?.id),
+      topicAwards.get(`topic:${topic.id}`),
+      "topic",
+      topic.id
     ));
     for (const reply of replies) {
       topicView.append(renderPost(
@@ -514,7 +613,11 @@ async function showTopic(id) {
         "topic-reply",
         null,
         activityByUser.get(reply.profiles?.id),
-        `moderate-delete-reply:${reply.id}`
+        `moderate-delete-reply:${reply.id}`,
+        medalsByUser.get(reply.profiles?.id),
+        replyAwards.get(`reply:${reply.id}`),
+        "reply",
+        reply.id
       ));
     }
 
@@ -874,6 +977,28 @@ async function runModerationAction(action) {
   }
 }
 
+async function runVoteAction(action) {
+  if (!currentUser) {
+    openAuth("login");
+    return;
+  }
+
+  const [, postType, postId] = action.split(":");
+  const parameters = {
+    p_topic_id: postType === "topic" ? postId : null,
+    p_reply_id: postType === "reply" ? postId : null
+  };
+  try {
+    const { error } = await supabase.rpc("cast_post_vote", parameters);
+    if (error) throw error;
+    const route = decodeURIComponent(window.location.hash.slice(1));
+    if (route.startsWith("topic/")) await showTopic(route.slice("topic/".length));
+  } catch (error) {
+    console.error("Could not cast post vote:", error);
+    setForumMessage(`Could not cast vote: ${error.message}`, true);
+  }
+}
+
 document.addEventListener("click", event => {
   const authButton = event.target.closest("[data-auth]");
   if (authButton) {
@@ -899,6 +1024,8 @@ document.addEventListener("click", event => {
     }
   } else if (action.startsWith("moderate-delete-")) {
     void runModerationAction(action);
+  } else if (action.startsWith("vote:")) {
+    void runVoteAction(action);
   } else if (action === "auth-signup" || action === "auth-login") {
     if (!supabase) {
       setForumMessage("Forum setup is not finished. Add the Supabase project details first.", true);
