@@ -19,6 +19,7 @@ const authMode = { value: "signup" };
 let supabase;
 let currentUser;
 let boards = [];
+let moderatorIds = new Set();
 
 const siteTitles = [
   "Another Retro Gaming Larping Forum",
@@ -54,11 +55,79 @@ function makeButton(text, action, className = "small-button") {
   return button;
 }
 
+function addSilkIcon(element, filename) {
+  const icon = document.createElement("img");
+  icon.className = "silk-icon";
+  icon.src = `_layouts/assets/silk-icons/${filename}.png`;
+  icon.alt = "";
+  icon.setAttribute("aria-hidden", "true");
+  element.prepend(icon);
+  return element;
+}
+
 function formatDate(value) {
   return new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",
     timeStyle: "short"
   }).format(new Date(value));
+}
+
+async function loadModerators() {
+  const { data, error } = await supabase.from("moderators").select("user_id");
+  if (error) throw error;
+  moderatorIds = new Set(data.map(moderator => moderator.user_id));
+}
+
+async function loadMemberActivity(userIds) {
+  const ids = [...new Set(userIds.filter(Boolean))];
+  if (!ids.length) return new Map();
+  const { data, error } = await supabase.from("member_activity")
+    .select("user_id,joined_at,post_count,active_days")
+    .in("user_id", ids);
+  if (error) throw error;
+  return new Map(data.map(activity => [activity.user_id, activity]));
+}
+
+function appendMemberLabels(container, userId, activity) {
+  const labels = makeElement("span", "member-labels");
+  let hasLabels = false;
+  if (moderatorIds.has(userId)) {
+    labels.append(makeElement("span", "moderator-badge", "Moderator"));
+    hasLabels = true;
+  }
+
+  if (activity) {
+    const ageDays = (Date.now() - new Date(activity.joined_at).getTime()) / 86400000;
+    const medals = [
+      {
+        name: "Bronze",
+        className: "medal-bronze",
+        earned: activity.post_count >= 5 && activity.active_days >= 3 && ageDays >= 7,
+        description: "5 posts across 3 active days; account is at least 7 days old"
+      },
+      {
+        name: "Silver",
+        className: "medal-silver",
+        earned: activity.post_count >= 20 && activity.active_days >= 10 && ageDays >= 30,
+        description: "20 posts across 10 active days; account is at least 30 days old"
+      },
+      {
+        name: "Gold",
+        className: "medal-gold",
+        earned: activity.post_count >= 50 && activity.active_days >= 30 && ageDays >= 90,
+        description: "50 posts across 30 active days; account is at least 90 days old"
+      }
+    ];
+    for (const medal of medals) {
+      if (!medal.earned) continue;
+      const badge = makeElement("span", `medal-badge ${medal.className}`, medal.name);
+      badge.title = medal.description;
+      labels.append(badge);
+      hasLabels = true;
+    }
+  }
+
+  if (hasLabels) container.append(labels);
 }
 
 function setStat(name, value) {
@@ -78,6 +147,9 @@ function updateAccount(user) {
     profileButton.setAttribute("aria-label", `Edit profile for ${username}`);
     const avatar = makeElement("span", "account-avatar", username.slice(0, 1).toUpperCase());
     profileButton.append(avatar, makeElement("span", "", username));
+    if (moderatorIds.has(user.id)) {
+      profileButton.append(makeElement("span", "moderator-badge account-moderator-badge", "Moderator"));
+    }
     links.append(profileButton);
     links.append(makeButton("Log out", "logout", "text-button"));
     void loadAccountAvatar(user.id, avatar);
@@ -210,10 +282,11 @@ async function loadStats() {
 
 async function loadLatestDiscussions() {
   const { data, error } = await supabase.from("topics")
-    .select("id,title,updated_at,profiles!topics_author_id_fkey(username),boards!topics_board_id_fkey(title)")
+    .select("id,title,updated_at,profiles!topics_author_id_fkey(id,username),boards!topics_board_id_fkey(title)")
     .order("updated_at", { ascending: false })
     .limit(5);
   if (error) throw error;
+  const activityByUser = await loadMemberActivity(data.map(topic => topic.profiles?.id));
 
   const list = document.querySelector("#latest-discussions");
   list.replaceChildren();
@@ -230,6 +303,7 @@ async function loadLatestDiscussions() {
       link,
       makeElement("span", "latest-topic-meta", `${topic.boards?.title || "Forum"} · ${topic.profiles?.username || "member"}`)
     );
+    appendMemberLabels(item, topic.profiles?.id, activityByUser.get(topic.profiles?.id));
     list.append(item);
   }
 }
@@ -266,18 +340,22 @@ async function showBoard(slug) {
   boardView.replaceChildren();
   appendBackLink(boardView);
   boardView.append(makeElement("h2", "view-title", board.title));
-  boardView.append(makeButton("Start a topic", `compose:${board.slug}`, "primary-button"));
+  boardView.append(addSilkIcon(
+    makeButton("Start a topic", `compose:${board.slug}`, "primary-button"),
+    "comment-add"
+  ));
   const list = makeElement("div", "topic-list");
   list.append(makeElement("p", "empty-state", "Loading topics…"));
   boardView.append(list);
 
   try {
     const { data, error } = await supabase.from("topics")
-      .select("id,title,body,image_url,created_at,updated_at,profiles!topics_author_id_fkey(username),replies(count)")
+      .select("id,title,body,image_url,created_at,updated_at,profiles!topics_author_id_fkey(id,username),replies(count)")
       .eq("board_id", board.id)
       .order("updated_at", { ascending: false })
       .range(0, 49);
     if (error) throw error;
+    const activityByUser = await loadMemberActivity(data.map(topic => topic.profiles?.id));
     list.replaceChildren();
     if (!data.length) {
       list.append(makeElement("p", "empty-state", "No topics here yet. Start the first conversation."));
@@ -308,6 +386,7 @@ async function showBoard(slug) {
         makeElement("p", "topic-meta", `${topic.profiles?.username || "member"} · ${formatDate(topic.updated_at)} · ${replyCount} replies`),
         makeElement("p", "topic-preview", topic.body)
       );
+      appendMemberLabels(details, topic.profiles?.id, activityByUser.get(topic.profiles?.id));
       item.append(details);
       list.append(item);
     }
@@ -327,7 +406,7 @@ function safeHttpsUrl(value) {
   }
 }
 
-function renderPost(profile, date, body, className, imageUrl = null) {
+function renderPost(profile, date, body, className, imageUrl = null, activity = null, moderationAction = null) {
   const post = makeElement("article", `forum-post ${className}`);
   const author = profile?.username || "member";
   const authorPanel = makeElement("aside", "post-author");
@@ -343,6 +422,7 @@ function renderPost(profile, date, body, className, imageUrl = null) {
     avatar.append(image);
   }
   authorPanel.append(avatar, makeElement("strong", "post-author-name", author));
+  appendMemberLabels(authorPanel, profile?.id, activity);
 
   const profileLink = safeHttpsUrl(profile?.profile_link);
   if (profileLink) {
@@ -359,6 +439,11 @@ function renderPost(profile, date, body, className, imageUrl = null) {
   const content = makeElement("div", "post-content");
   const header = makeElement("div", "post-header");
   header.append(makeElement("time", "", formatDate(date)));
+  if (moderationAction && moderatorIds.has(currentUser?.id)) {
+    const deleteButton = makeButton("Delete", moderationAction, "small-button moderation-delete");
+    deleteButton.title = "Remove this post";
+    header.append(deleteButton);
+  }
   content.append(header, makeElement("p", "post-body", body));
   const safeImageUrl = safeHttpsUrl(imageUrl);
   if (safeImageUrl) {
@@ -385,11 +470,11 @@ async function showTopic(id) {
   try {
     const [{ data: topic, error: topicError }, { data: replies, error: replyError }] = await Promise.all([
       supabase.from("topics")
-        .select("id,board_id,title,body,image_url,created_at,profiles!topics_author_id_fkey(username,avatar_url,signature,profile_link)")
+        .select("id,board_id,title,body,image_url,created_at,profiles!topics_author_id_fkey(id,username,avatar_url,signature,profile_link)")
         .eq("id", id)
         .maybeSingle(),
       supabase.from("replies")
-        .select("id,body,created_at,profiles!replies_author_id_fkey(username,avatar_url,signature,profile_link)")
+        .select("id,body,created_at,profiles!replies_author_id_fkey(id,username,avatar_url,signature,profile_link)")
         .eq("topic_id", id)
         .order("created_at")
     ]);
@@ -397,13 +482,31 @@ async function showTopic(id) {
     if (replyError) throw replyError;
     if (!topic) throw new Error("This topic no longer exists.");
 
+    const profiles = [topic.profiles, ...replies.map(reply => reply.profiles)];
+    const activityByUser = await loadMemberActivity(profiles.map(profile => profile?.id));
     const board = boards.find(item => item.id === topic.board_id);
     topicView.replaceChildren();
     appendBackLink(topicView, `← ${board?.title || "Forum index"}`);
     topicView.append(makeElement("h2", "view-title", topic.title));
-    topicView.append(renderPost(topic.profiles, topic.created_at, topic.body, "topic-first-post", topic.image_url));
+    topicView.append(renderPost(
+      topic.profiles,
+      topic.created_at,
+      topic.body,
+      "topic-first-post",
+      topic.image_url,
+      activityByUser.get(topic.profiles?.id),
+      `moderate-delete-topic:${topic.id}`
+    ));
     for (const reply of replies) {
-      topicView.append(renderPost(reply.profiles, reply.created_at, reply.body, "topic-reply"));
+      topicView.append(renderPost(
+        reply.profiles,
+        reply.created_at,
+        reply.body,
+        "topic-reply",
+        null,
+        activityByUser.get(reply.profiles?.id),
+        `moderate-delete-reply:${reply.id}`
+      ));
     }
 
     if (currentUser) {
@@ -679,6 +782,89 @@ profileForm.addEventListener("submit", async event => {
   }
 });
 
+function getTopicImagePath(imageUrl) {
+  const safeUrl = safeHttpsUrl(imageUrl);
+  if (!safeUrl) return null;
+  const parsedUrl = new URL(safeUrl);
+  const projectOrigin = new URL(supabaseUrl).origin;
+  const publicBucketPrefix = "/storage/v1/object/public/topic-images/";
+  if (parsedUrl.origin !== projectOrigin || !parsedUrl.pathname.startsWith(publicBucketPrefix)) return null;
+  try {
+    return decodeURIComponent(parsedUrl.pathname.slice(publicBucketPrefix.length));
+  } catch {
+    return null;
+  }
+}
+
+async function moderateDeleteTopic(topicId) {
+  if (!moderatorIds.has(currentUser?.id)) throw new Error("Moderator access is required.");
+  if (!window.confirm("Delete this topic and all of its replies? This cannot be undone.")) return;
+
+  const { data: topic, error: topicError } = await supabase.from("topics")
+    .select("board_id,image_url")
+    .eq("id", topicId)
+    .maybeSingle();
+  if (topicError) throw topicError;
+  if (!topic) throw new Error("This topic no longer exists.");
+
+  const { data: deleted, error } = await supabase.from("topics")
+    .delete()
+    .eq("id", topicId)
+    .select("id")
+    .maybeSingle();
+  if (error) throw error;
+  if (!deleted) throw new Error("The topic could not be deleted. Check moderator access.");
+
+  let cleanupError;
+  const imagePath = getTopicImagePath(topic.image_url);
+  if (imagePath) {
+    const result = await supabase.storage.from("topic-images").remove([imagePath]);
+    cleanupError = result.error;
+  }
+
+  await refreshForum();
+  const board = boards.find(item => item.id === topic.board_id);
+  window.location.hash = board ? `board/${encodeURIComponent(board.slug)}` : "forums";
+  if (cleanupError) {
+    setForumMessage(`The topic was deleted, but its image could not be removed: ${cleanupError.message}`, true);
+  }
+}
+
+async function moderateDeleteReply(replyId) {
+  if (!moderatorIds.has(currentUser?.id)) throw new Error("Moderator access is required.");
+  if (!window.confirm("Delete this reply? This cannot be undone.")) return;
+
+  const { data: reply, error: replyError } = await supabase.from("replies")
+    .select("topic_id")
+    .eq("id", replyId)
+    .maybeSingle();
+  if (replyError) throw replyError;
+  if (!reply) throw new Error("This reply no longer exists.");
+
+  const { data: deleted, error } = await supabase.from("replies")
+    .delete()
+    .eq("id", replyId)
+    .select("id")
+    .maybeSingle();
+  if (error) throw error;
+  if (!deleted) throw new Error("The reply could not be deleted. Check moderator access.");
+  await refreshForum();
+  await showTopic(reply.topic_id);
+}
+
+async function runModerationAction(action) {
+  try {
+    if (action.startsWith("moderate-delete-topic:")) {
+      await moderateDeleteTopic(action.slice("moderate-delete-topic:".length));
+    } else if (action.startsWith("moderate-delete-reply:")) {
+      await moderateDeleteReply(action.slice("moderate-delete-reply:".length));
+    }
+  } catch (error) {
+    console.error("Could not complete moderation action:", error);
+    setForumMessage(`Could not complete moderation action: ${error.message}`, true);
+  }
+}
+
 document.addEventListener("click", event => {
   const authButton = event.target.closest("[data-auth]");
   if (authButton) {
@@ -702,6 +888,8 @@ document.addEventListener("click", event => {
     } else {
       openAuth("signup");
     }
+  } else if (action.startsWith("moderate-delete-")) {
+    void runModerationAction(action);
   } else if (action === "auth-signup" || action === "auth-login") {
     if (!supabase) {
       setForumMessage("Forum setup is not finished. Add the Supabase project details first.", true);
@@ -787,6 +975,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
   try {
     const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
     supabase = createClient(supabaseUrl, supabaseAnonKey);
+    await loadModerators();
     const { data: { session } } = await supabase.auth.getSession();
     updateAccount(session?.user || null);
     supabase.auth.onAuthStateChange((_event, nextSession) => {

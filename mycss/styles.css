@@ -353,6 +353,19 @@ button:active {
   font-size: 12px;
 }
 
+.silk-icon {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin-right: 6px;
+  vertical-align: -3px;
+}
+
+.panel-action .silk-icon,
+.primary-button .silk-icon {
+  vertical-align: -4px;
+}
+
 .stats-list {
   margin: 0;
 }
@@ -521,6 +534,10 @@ button:active {
 
 .site-footer a {
   color: #9fcfe2;
+}
+
+.icon-credit {
+  color: #8e9bac;
 }
 
 .footer-divider {
@@ -703,6 +720,56 @@ button:active {
   min-width: 0;
 }
 
+.member-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 5px;
+}
+
+.medal-badge,
+.moderator-badge {
+  display: inline-block;
+  padding: 1px 5px;
+  border: 1px solid;
+  font-size: 9px;
+  font-weight: bold;
+  line-height: 1.5;
+  text-transform: uppercase;
+}
+
+.medal-bronze {
+  border-color: #9c7048;
+  background: #453326;
+  color: #e6b27e;
+}
+
+.medal-silver {
+  border-color: #8494a8;
+  background: #303b49;
+  color: #d5e0ec;
+}
+
+.medal-gold {
+  border-color: #b18b45;
+  background: #4a3c25;
+  color: #f4d17b;
+}
+
+.moderator-badge {
+  border-color: #5595a9;
+  background: #193b49;
+  color: #9de3f5;
+}
+
+.account-moderator-badge {
+  margin-left: 3px;
+}
+
+.post-author .member-labels {
+  justify-content: center;
+}
+
 .topic-meta {
   margin: 3px 0;
   color: #8998aa;
@@ -794,6 +861,12 @@ button:active {
   border-bottom: 1px solid #3c4c62;
   background: linear-gradient(#34445a, #29384c);
   color: #8dd7f2;
+  font-size: 10px;
+}
+
+.moderation-delete {
+  margin-left: auto;
+  padding: 3px 7px;
   font-size: 10px;
 }
 
