@@ -61,7 +61,7 @@ function makeButton(text, action, className = "small-button") {
 function addSilkIcon(element, filename) {
   const icon = document.createElement("img");
   icon.className = "silk-icon";
-  icon.src = `_layouts/assets/silk-icons/${filename}.png`;
+  icon.src = `assets/silk-icons/${filename}.png`;
   icon.alt = "";
   icon.setAttribute("aria-hidden", "true");
   element.prepend(icon);
@@ -137,7 +137,7 @@ async function updateMedalCase(user) {
       for (let index = 0; index < count; index += 1) {
         const token = document.createElement("img");
         token.className = `medal-token ${tier.className}`;
-        token.src = "_layouts/assets/silk-icons/star.png";
+        token.src = "assets/silk-icons/star.png";
         token.alt = `${tier.name} medal`;
         token.title = `${tier.name} medal`;
         tokens.append(token);
