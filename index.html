@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#111b2d" />
   <title>Nickel-Dhingy.com — Classic PC &amp; Console Games</title>
+  <link rel="icon" type="image/png" href="_layouts/assets/ND-Fav.png" />
   <link rel="stylesheet" href="mycss/styles.css" />
   <script type="module" src="myjs/forum.js"></script>
 </head>
@@ -12,9 +13,10 @@
   <div class="site-shell">
     <header class="masthead">
       <div class="masthead-top">
-        <a class="brand" href="#top" aria-label="Nickel-Dhingy home">
+        <div class="brand">
           <img src="_layouts/assets/nickel-dhingy-logo.png" alt="Nickel-Dhingy.com" class="logo" />
-        </a>
+          <p class="site-title"></p>
+        </div>
         <div class="account-links" id="account-links">
           <button type="button" class="text-button" data-auth="signup">Sign up</button>
           <span aria-hidden="true">|</span>
@@ -28,10 +30,28 @@
 
     <main id="top" class="page-content">
       <div class="content-grid">
+        <aside class="sidebar left-sidebar" aria-label="Recent forum activity">
+          <section class="side-panel">
+            <h2>Latest Discussions</h2>
+            <ul id="latest-discussions" class="latest-discussions">
+              <li class="latest-empty">Loading recent topics…</li>
+            </ul>
+          </section>
+
+          <section class="side-panel">
+            <h2>Forum News</h2>
+            <div class="bulletin">
+              <span class="bulletin-date" aria-hidden="true">NEWS</span>
+              <div>
+                <strong>Welcome to the forum!</strong>
+                <p>Find your favorite PC and console games, share recommendations, and join the conversation.</p>
+              </div>
+            </div>
+          </section>
+        </aside>
+
         <section id="forums" class="forum-column" aria-labelledby="forums-title">
           <div class="section-heading">
-            <h2 id="forums-title">Classic PC &amp; Console Game Boards</h2>
-            <span class="heading-note">Half-Life, SNES, N64, PS1 &amp; more</span>
           </div>
 
           <div class="forum-table-wrap">
@@ -56,27 +76,28 @@
           <section id="composer-view" class="forum-view" hidden></section>
         </section>
 
-        <aside class="sidebar">
+        <aside class="sidebar right-sidebar" aria-label="Community information">
           <section class="side-panel">
             <h2>Community Stats</h2>
             <dl class="stats-list">
               <div><dt>Members</dt><dd data-stat="members">—</dd></div>
               <div><dt>Topics</dt><dd data-stat="topics">—</dd></div>
-              <div><dt>Replies</dt><dd data-stat="replies">—</dd></div>
+              <div><dt>Total Messages</dt><dd data-stat="replies">—</dd></div>
             </dl>
             <p class="online-note" id="newest-member">Member activity will appear here.</p>
           </section>
 
           <section class="side-panel">
-            <h2>Community Guidelines</h2>
+            <h2>My rules</h2>
             <p class="panel-copy">Be Nice and don't start just sending pirated games... I'm not Vimm's Lair or your personal NAS.</p>
-            <p class="panel-copy">Need help with your account? Contact the site administrator.</p>
+            <p class="panel-copy">If you really need me for anything just email me, Huff@nickel-dhingy.com
+            </p>
           </section>
 
           <section class="side-panel members-panel">
-            <h2>Your Next Continue?</h2>
-            <p>Start a topic about the game you still think about. The first post on a new board is yours to make.</p>
-            <button type="button" class="panel-action" data-auth="signup">Join the forum</button>
+            <h2>please post</h2>
+            <p>I wanna talk to someone. please make a post about something bruv literally anything.</p>
+            <button type="button" class="panel-action" data-auth="signup">make a post</button>
           </section>
         </aside>
       </div>
@@ -126,12 +147,12 @@
       <label class="form-field">
         Profile picture URL
         <input name="avatar_url" type="url" maxlength="500" placeholder="https://example.com/avatar.jpg" autocomplete="url" />
-        <small>Use a direct HTTPS image link, or upload a JPG or GIF below. Leave both blank for initials.</small>
+        <small>Use a direct HTTPS image link, or upload a JPG, GIF, or WebP below. Leave both blank for initials.</small>
       </label>
       <label class="form-field">
         Upload profile picture
-        <input name="avatar_file" type="file" accept=".jpg,.jpeg,.gif,image/jpeg,image/gif" />
-        <small>JPG or GIF, up to 2 MB. An uploaded file takes priority over the URL above.</small>
+        <input name="avatar_file" type="file" accept=".jpg,.jpeg,.gif,.webp,image/jpeg,image/gif,image/webp" />
+        <small>JPG, GIF, or WebP, up to 2 MB. An uploaded file takes priority over the URL above.</small>
       </label>
       <label class="form-field">
         Signature

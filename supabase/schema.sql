@@ -47,7 +47,7 @@ values (
   'profile-avatars',
   true,
   2097152,
-  array['image/jpeg', 'image/gif']
+  array['image/jpeg', 'image/gif', 'image/webp']
 )
 on conflict (id) do update set
   public = excluded.public,
@@ -106,18 +106,27 @@ create table if not exists public.replies (
 create index if not exists topics_board_updated_at on public.topics (board_id, updated_at desc);
 create index if not exists replies_topic_created_at on public.replies (topic_id, created_at);
 
+update public.boards
+set position = position + 1000
+where slug = 'sega-other-classics';
+
+delete from public.boards
+where slug = 'modern-games';
+
 insert into public.boards (slug, title, category, position)
 values
-  ('dos-windows', 'Main Bulletin Board', 'PC GAMING', 1),
-  ('adventure-games', 'Game Clips & Images', 'PC GAMING', 2),
-  ('rpg-strategy', 'Help & Tech', 'PC GAMING', 3),
-  ('action-shooters', 'PC Multiplayer & LAN', 'PC GAMING', 4),
-  ('simulations', 'PC Mods & Creations', 'PC GAMING', 5),
-  ('shareware', 'Games & Recommendations', 'PC GAMING', 6),
-  ('nintendo-classics', 'Nintendo', 'CONSOLES', 7),
-  ('playstation-classics', 'PlayStation', 'CONSOLES', 8),
-  ('sega-other-classics', 'Sega & Other Consoles', 'CONSOLES', 9),
-  ('modern-games', 'Modern Games (Misc)', 'MODERN GAMING', 10)
+  ('dos-windows', 'Main Board', 'BOARDS', 1),
+  ('adventure-games', 'Clips & Images', 'BOARDS', 2),
+  ('rpg-strategy', 'Help & Tech', 'BOARDS', 3),
+  ('action-shooters', 'Multiplayer & LAN', 'BOARDS', 4),
+  ('simulations', 'Mods & Creations', 'BOARDS', 5),
+  ('shareware', 'Games & Recommendations', 'BOARDS', 6),
+  ('nintendo-classics', 'Nintendo', 'EVEN MORE BOARDS', 7),
+  ('playstation-classics', 'PlayStation', 'EVEN MORE BOARDS', 8),
+  ('xbox-classics', 'Xbox', 'EVEN MORE BOARDS', 9),
+  ('sega-other-classics', 'Sega & Other Consoles', 'EVEN MORE BOARDS', 10),
+  ('off-topic', 'Off-Topic & Miscellaneous', 'Obiligitory Off-Topic Board', 11),
+  ('rathner', 'Airmen Rathners Personal Poop Board', 'Obiligitory Off-Topic Board', 12)
 on conflict (slug) do update set
   title = excluded.title,
   category = excluded.category,

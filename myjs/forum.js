@@ -14,10 +14,23 @@ const authForm = document.querySelector("#auth-form");
 const authMessage = document.querySelector("#auth-message");
 const usernameField = document.querySelector("#username-field");
 const authPassword = authForm.elements.password;
+const siteTitle = document.querySelector(".site-title");
 const authMode = { value: "signup" };
 let supabase;
 let currentUser;
 let boards = [];
+
+const siteTitles = [
+  "Another Retro Gaming Larping Forum",
+  "Larp Larp Larp Shaur",
+  "Hi RetroDev",
+  "I, I don't know what to add to this forum ngl",
+  "We're just like BitView. except like we don't host videos, actually we're more like SomethingAwful"
+];
+
+if (siteTitle) {
+  siteTitle.textContent = siteTitles[Math.floor(Math.random() * siteTitles.length)];
+}
 
 function setForumMessage(message, isError = false) {
   forumMessage.textContent = message;
@@ -192,13 +205,41 @@ async function loadStats() {
   document.querySelector("#newest-member").textContent = newestMemberText;
 }
 
+async function loadLatestDiscussions() {
+  const { data, error } = await supabase.from("topics")
+    .select("id,title,updated_at,profiles!topics_author_id_fkey(username),boards!topics_board_id_fkey(title)")
+    .order("updated_at", { ascending: false })
+    .limit(5);
+  if (error) throw error;
+
+  const list = document.querySelector("#latest-discussions");
+  list.replaceChildren();
+  if (!data.length) {
+    list.append(makeElement("li", "latest-empty", "No discussions yet. Start the first one!"));
+    return;
+  }
+
+  for (const topic of data) {
+    const item = document.createElement("li");
+    const link = makeElement("a", "latest-topic-title", topic.title);
+    link.href = `#topic/${topic.id}`;
+    item.append(
+      link,
+      makeElement("span", "latest-topic-meta", `${topic.boards?.title || "Forum"} · ${topic.profiles?.username || "member"}`)
+    );
+    list.append(item);
+  }
+}
+
 async function refreshForum() {
   setForumMessage("Loading the boards…");
   try {
-    await Promise.all([loadBoards(), loadStats()]);
+    await Promise.all([loadBoards(), loadStats(), loadLatestDiscussions()]);
     setForumMessage("Board activity and counts are live from the forum database.");
   } catch (error) {
     console.error("Could not load forum data:", error);
+    const latestDiscussions = document.querySelector("#latest-discussions");
+    latestDiscussions.replaceChildren(makeElement("li", "latest-empty", "Recent discussions could not be loaded."));
     setForumMessage(`Could not load forum data: ${error.message}`, true);
   }
 }
@@ -519,9 +560,9 @@ profileForm.addEventListener("submit", async event => {
 
     let avatarUrl = null;
     if (avatarFile) {
-      const allowedTypes = ["image/jpeg", "image/gif"];
+      const allowedTypes = ["image/jpeg", "image/gif", "image/webp"];
       if (!allowedTypes.includes(avatarFile.type)) {
-        throw new Error("Choose a JPG or GIF image file.");
+        throw new Error("Choose a JPG, GIF, or WebP image file.");
       }
       if (avatarFile.size > 2 * 1024 * 1024) {
         throw new Error("Profile picture files must be 2 MB or smaller.");
@@ -654,6 +695,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
   cell.colSpan = 4;
   row.append(cell);
   boardList.append(row);
+  document.querySelector("#latest-discussions")
+    .replaceChildren(makeElement("li", "latest-empty", "Recent discussions will appear after forum setup."));
   setForumMessage("No sample posts or statistics are shown. This forum will display live activity after setup.");
   handleRoute();
 } else {
