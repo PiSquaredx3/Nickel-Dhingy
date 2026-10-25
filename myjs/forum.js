@@ -72,6 +72,10 @@ function formatDate(value) {
   }).format(new Date(value));
 }
 
+function formatDateOnly(value) {
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(value));
+}
+
 async function loadModerators() {
   const { data, error } = await supabase.from("moderators").select("user_id");
   if (error) throw error;
@@ -410,6 +414,11 @@ function renderPost(profile, date, body, className, imageUrl = null, activity = 
   const post = makeElement("article", `forum-post ${className}`);
   const author = profile?.username || "member";
   const authorPanel = makeElement("aside", "post-author");
+  if (activity?.joined_at) {
+    const joinedDate = makeElement("time", "post-join-date", `Joined ${formatDateOnly(activity.joined_at)}`);
+    joinedDate.dateTime = activity.joined_at;
+    authorPanel.append(joinedDate);
+  }
   const avatar = makeElement("div", "post-avatar", author.slice(0, 1).toUpperCase());
   const avatarUrl = safeHttpsUrl(profile?.avatar_url);
   if (avatarUrl) {
