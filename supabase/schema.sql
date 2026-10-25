@@ -47,7 +47,7 @@ values (
   'profile-avatars',
   true,
   2097152,
-  array['image/jpeg', 'image/gif', 'image/webp']
+  array['image/jpeg', 'image/gif', 'image/webp', 'image/png']
 )
 on conflict (id) do update set
   public = excluded.public,
@@ -60,7 +60,7 @@ values (
   'topic-images',
   true,
   2097152,
-  array['image/jpeg', 'image/gif', 'image/webp']
+  array['image/jpeg', 'image/gif', 'image/webp', 'image/png']
 )
 on conflict (id) do update set
   public = excluded.public,

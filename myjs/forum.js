@@ -28,7 +28,7 @@ const siteTitles = [
   "We're just like BitView. except like we don't host videos, actually we're more like SomethingAwful"
 ];
 
-const allowedImageTypes = ["image/jpeg", "image/gif", "image/webp"];
+const allowedImageTypes = ["image/jpeg", "image/gif", "image/webp", "image/png"];
 const maxImageSize = 2 * 1024 * 1024;
 
 if (siteTitle) {
@@ -449,8 +449,8 @@ function makePostForm(heading, submitLabel, onSubmit, leadingFields = [], includ
     imageInput = document.createElement("input");
     imageInput.name = "image";
     imageInput.type = "file";
-    imageInput.accept = ".jpg,.jpeg,.gif,.webp,image/jpeg,image/gif,image/webp";
-    const hint = makeElement("small", "", "JPG, GIF, or WebP; up to 2 MB.");
+    imageInput.accept = ".jpg,.jpeg,.gif,.webp,.png,image/jpeg,image/gif,image/webp,image/png";
+    const hint = makeElement("small", "", "JPG, GIF, WebP, or PNG; up to 2 MB.");
     imageLabel.append(imageInput, hint);
     form.append(imageLabel);
   }
@@ -470,7 +470,7 @@ function makePostForm(heading, submitLabel, onSubmit, leadingFields = [], includ
       const imageFile = imageInput?.files[0] || null;
       if (imageFile) {
         if (!allowedImageTypes.includes(imageFile.type)) {
-          throw new Error("Choose a JPG, GIF, or WebP image file.");
+          throw new Error("Choose a JPG, GIF, WebP, or PNG image file.");
         }
         if (imageFile.size > maxImageSize) {
           throw new Error("Attached images must be 2 MB or smaller.");
@@ -636,7 +636,7 @@ profileForm.addEventListener("submit", async event => {
     let avatarUrl = null;
     if (avatarFile) {
       if (!allowedImageTypes.includes(avatarFile.type)) {
-        throw new Error("Choose a JPG, GIF, or WebP image file.");
+        throw new Error("Choose a JPG, GIF, WebP, or PNG image file.");
       }
       if (avatarFile.size > maxImageSize) {
         throw new Error("Profile picture files must be 2 MB or smaller.");

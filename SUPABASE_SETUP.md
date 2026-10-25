@@ -14,6 +14,6 @@ The site is static and can stay on GitHub Pages. Supabase provides email/passwor
    Never put a `service_role` or secret key in this website.
 4. In **Authentication → URL Configuration**, set the Site URL to the published site URL and add that URL to the allowed redirect URLs. For local testing, add `http://localhost:8000/**` as well.
 5. In **Authentication → Providers → Email**, choose whether new members must confirm their email. With confirmation enabled, sign-up sends a confirmation email before the member can log in.
-6. Publish the site, then register an account and create a topic to verify the setup. Signed-in members can attach a JPG, GIF, or WebP image (up to 2 MB) to a new topic. They can also click their account name to add a profile picture URL or upload a JPG, GIF, or WebP (up to 2 MB), signature, and optional link; these appear alongside their messages.
+6. Publish the site, then register an account and create a topic to verify the setup. Signed-in members can attach a JPG, GIF, WebP, or PNG image (up to 2 MB) to a new topic. They can also click their account name to add a profile picture URL or upload a JPG, GIF, WebP, or PNG (up to 2 MB), signature, and optional link; these appear alongside their messages.
 
 The public key is expected to be visible in a static website. Row-level security in the SQL schema restricts writes to signed-in members and ties each topic and reply to its author. Public visitors can read boards, topics, replies, and forum usernames. Email addresses are not exposed.
