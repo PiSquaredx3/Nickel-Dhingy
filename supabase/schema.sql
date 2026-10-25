@@ -54,6 +54,19 @@ on conflict (id) do update set
   file_size_limit = excluded.file_size_limit,
   allowed_mime_types = excluded.allowed_mime_types;
 
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'topic-images',
+  'topic-images',
+  true,
+  2097152,
+  array['image/jpeg', 'image/gif', 'image/webp']
+)
+on conflict (id) do update set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
 drop policy if exists "Members can read their own avatar files" on storage.objects;
 create policy "Members can read their own avatar files"
   on storage.objects for select to authenticated
@@ -82,17 +95,42 @@ create policy "Members can update their own avatar files"
     and (storage.foldername(name))[1] = (select auth.uid())::text
   );
 
+drop policy if exists "Topic images are publicly readable" on storage.objects;
+create policy "Topic images are publicly readable"
+  on storage.objects for select
+  using (bucket_id = 'topic-images');
+
+drop policy if exists "Members can upload their own topic images" on storage.objects;
+create policy "Members can upload their own topic images"
+  on storage.objects for insert to authenticated
+  with check (
+    bucket_id = 'topic-images'
+    and (storage.foldername(name))[1] = (select auth.uid())::text
+  );
+
+drop policy if exists "Members can delete their own topic images" on storage.objects;
+create policy "Members can delete their own topic images"
+  on storage.objects for delete to authenticated
+  using (
+    bucket_id = 'topic-images'
+    and (storage.foldername(name))[1] = (select auth.uid())::text
+  );
+
 create table if not exists public.topics (
   id uuid primary key default gen_random_uuid(),
   board_id bigint not null references public.boards (id) on delete cascade,
   author_id uuid not null constraint topics_author_id_fkey references public.profiles (id) on delete cascade,
   title text not null,
   body text not null,
+  image_url text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint topics_title_length check (char_length(btrim(title)) between 1 and 120),
   constraint topics_body_length check (char_length(btrim(body)) between 1 and 10000)
 );
+
+alter table public.topics
+  add column if not exists image_url text;
 
 create table if not exists public.replies (
   id uuid primary key default gen_random_uuid(),
@@ -113,6 +151,10 @@ where slug = 'sega-other-classics';
 delete from public.boards
 where slug = 'modern-games';
 
+update public.boards
+set position = (select coalesce(max(position), 0) + 1 from public.boards)
+where slug = 'rathner';
+
 insert into public.boards (slug, title, category, position)
 values
   ('dos-windows', 'Main Board', 'BOARDS', 1),
@@ -125,8 +167,14 @@ values
   ('playstation-classics', 'PlayStation', 'EVEN MORE BOARDS', 8),
   ('xbox-classics', 'Xbox', 'EVEN MORE BOARDS', 9),
   ('sega-other-classics', 'Sega & Other Consoles', 'EVEN MORE BOARDS', 10),
-  ('off-topic', 'Off-Topic & Miscellaneous', 'Obiligitory Off-Topic Board', 11),
-  ('rathner', 'Airmen Rathners Personal Poop Board', 'Obiligitory Off-Topic Board', 12)
+  ('off-topic', 'Off-Topic & Miscellaneous', 'NON-GAMING BOARDS', 11),
+  ('music', 'Music Discussion', 'NON-GAMING BOARDS', 12),
+  ('movies-tv', 'Movies & TV', 'NON-GAMING BOARDS', 13),
+  ('hobbies-projects', 'Hobbies & Projects', 'NON-GAMING BOARDS', 14),
+  ('tech-internet', 'Tech & Internet', 'NON-GAMING BOARDS', 15),
+  ('food-drink', 'Food & Drink', 'NON-GAMING BOARDS', 16),
+  ('books-comics', 'Books & Comics', 'NON-GAMING BOARDS', 17),
+  ('rathner', 'Airmen Rathners Personal Poop Board', 'NON-GAMING BOARDS', 99)
 on conflict (slug) do update set
   title = excluded.title,
   category = excluded.category,

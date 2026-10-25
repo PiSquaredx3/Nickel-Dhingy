@@ -28,6 +28,9 @@ const siteTitles = [
   "We're just like BitView. except like we don't host videos, actually we're more like SomethingAwful"
 ];
 
+const allowedImageTypes = ["image/jpeg", "image/gif", "image/webp"];
+const maxImageSize = 2 * 1024 * 1024;
+
 if (siteTitle) {
   siteTitle.textContent = siteTitles[Math.floor(Math.random() * siteTitles.length)];
 }
@@ -270,7 +273,7 @@ async function showBoard(slug) {
 
   try {
     const { data, error } = await supabase.from("topics")
-      .select("id,title,body,created_at,updated_at,profiles!topics_author_id_fkey(username),replies(count)")
+      .select("id,title,body,image_url,created_at,updated_at,profiles!topics_author_id_fkey(username),replies(count)")
       .eq("board_id", board.id)
       .order("updated_at", { ascending: false })
       .range(0, 49);
@@ -282,12 +285,30 @@ async function showBoard(slug) {
     }
     for (const topic of data) {
       const item = makeElement("article", "topic-list-item");
+      const imageUrl = safeHttpsUrl(topic.image_url);
+      if (imageUrl) {
+        const imageLink = makeElement("a", "topic-list-image-link");
+        imageLink.href = `#topic/${topic.id}`;
+        const image = document.createElement("img");
+        image.className = "topic-list-image";
+        image.src = imageUrl;
+        image.alt = "";
+        image.loading = "lazy";
+        image.referrerPolicy = "no-referrer";
+        image.addEventListener("error", () => imageLink.remove(), { once: true });
+        imageLink.append(image);
+        item.append(imageLink);
+      }
+      const details = makeElement("div", "topic-list-details");
       const title = makeElement("a", "topic-list-title", topic.title);
       title.href = `#topic/${topic.id}`;
-      item.append(title);
       const replyCount = topic.replies?.[0]?.count || 0;
-      item.append(makeElement("p", "topic-meta", `${topic.profiles?.username || "member"} · ${formatDate(topic.updated_at)} · ${replyCount} replies`));
-      item.append(makeElement("p", "topic-preview", topic.body));
+      details.append(
+        title,
+        makeElement("p", "topic-meta", `${topic.profiles?.username || "member"} · ${formatDate(topic.updated_at)} · ${replyCount} replies`),
+        makeElement("p", "topic-preview", topic.body)
+      );
+      item.append(details);
       list.append(item);
     }
   } catch (error) {
@@ -306,7 +327,7 @@ function safeHttpsUrl(value) {
   }
 }
 
-function renderPost(profile, date, body, className) {
+function renderPost(profile, date, body, className, imageUrl = null) {
   const post = makeElement("article", `forum-post ${className}`);
   const author = profile?.username || "member";
   const authorPanel = makeElement("aside", "post-author");
@@ -339,6 +360,17 @@ function renderPost(profile, date, body, className) {
   const header = makeElement("div", "post-header");
   header.append(makeElement("time", "", formatDate(date)));
   content.append(header, makeElement("p", "post-body", body));
+  const safeImageUrl = safeHttpsUrl(imageUrl);
+  if (safeImageUrl) {
+    const image = document.createElement("img");
+    image.className = "post-image";
+    image.src = safeImageUrl;
+    image.alt = "Image attached to post";
+    image.loading = "lazy";
+    image.referrerPolicy = "no-referrer";
+    image.addEventListener("error", () => image.remove(), { once: true });
+    content.append(image);
+  }
   post.append(authorPanel, content);
   return post;
 }
@@ -353,7 +385,7 @@ async function showTopic(id) {
   try {
     const [{ data: topic, error: topicError }, { data: replies, error: replyError }] = await Promise.all([
       supabase.from("topics")
-        .select("id,board_id,title,body,created_at,profiles!topics_author_id_fkey(username,avatar_url,signature,profile_link)")
+        .select("id,board_id,title,body,image_url,created_at,profiles!topics_author_id_fkey(username,avatar_url,signature,profile_link)")
         .eq("id", id)
         .maybeSingle(),
       supabase.from("replies")
@@ -369,7 +401,7 @@ async function showTopic(id) {
     topicView.replaceChildren();
     appendBackLink(topicView, `← ${board?.title || "Forum index"}`);
     topicView.append(makeElement("h2", "view-title", topic.title));
-    topicView.append(renderPost(topic.profiles, topic.created_at, topic.body, "topic-first-post"));
+    topicView.append(renderPost(topic.profiles, topic.created_at, topic.body, "topic-first-post", topic.image_url));
     for (const reply of replies) {
       topicView.append(renderPost(reply.profiles, reply.created_at, reply.body, "topic-reply"));
     }
@@ -397,7 +429,7 @@ async function showTopic(id) {
   }
 }
 
-function makePostForm(heading, submitLabel, onSubmit, leadingFields = []) {
+function makePostForm(heading, submitLabel, onSubmit, leadingFields = [], includeImage = false) {
   const form = document.createElement("form");
   form.className = "post-form";
   form.append(makeElement("h3", "form-heading", heading));
@@ -411,6 +443,17 @@ function makePostForm(heading, submitLabel, onSubmit, leadingFields = []) {
   textarea.autocomplete = "off";
   label.append(textarea);
   form.append(label);
+  let imageInput;
+  if (includeImage) {
+    const imageLabel = makeElement("label", "form-field", "Attach an image (optional)");
+    imageInput = document.createElement("input");
+    imageInput.name = "image";
+    imageInput.type = "file";
+    imageInput.accept = ".jpg,.jpeg,.gif,.webp,image/jpeg,image/gif,image/webp";
+    const hint = makeElement("small", "", "JPG, GIF, or WebP; up to 2 MB.");
+    imageLabel.append(imageInput, hint);
+    form.append(imageLabel);
+  }
   const feedback = makeElement("p", "form-message");
   feedback.setAttribute("role", "status");
   form.append(feedback);
@@ -424,7 +467,16 @@ function makePostForm(heading, submitLabel, onSubmit, leadingFields = []) {
     try {
       const body = textarea.value.trim();
       if (!body) throw new Error("Write a message before posting.");
-      await onSubmit(body);
+      const imageFile = imageInput?.files[0] || null;
+      if (imageFile) {
+        if (!allowedImageTypes.includes(imageFile.type)) {
+          throw new Error("Choose a JPG, GIF, or WebP image file.");
+        }
+        if (imageFile.size > maxImageSize) {
+          throw new Error("Attached images must be 2 MB or smaller.");
+        }
+      }
+      await onSubmit(body, imageFile);
     } catch (error) {
       console.error("Could not submit forum post:", error);
       feedback.textContent = error.message;
@@ -462,17 +514,40 @@ function showComposer(slug) {
   titleInput.maxLength = 120;
   titleInput.autocomplete = "off";
   titleLabel.append(titleInput);
-  const form = makePostForm("Start a new topic", "Post topic", async body => {
+  const form = makePostForm("Start a new topic", "Post topic", async (body, imageFile) => {
     const title = titleInput.value.trim();
     if (!title) throw new Error("Add a title before posting.");
+    let imagePath = null;
+    let imageUrl = null;
+    if (imageFile) {
+      imagePath = `${currentUser.id}/${crypto.randomUUID()}`;
+      const { error: uploadError } = await supabase.storage
+        .from("topic-images")
+        .upload(imagePath, imageFile, {
+          cacheControl: "3600",
+          contentType: imageFile.type,
+          upsert: false
+        });
+      if (uploadError) throw uploadError;
+      imageUrl = supabase.storage.from("topic-images").getPublicUrl(imagePath).data.publicUrl;
+    }
+
     const { data, error } = await supabase.from("topics")
-      .insert({ board_id: board.id, author_id: currentUser.id, title, body })
+      .insert({ board_id: board.id, author_id: currentUser.id, title, body, image_url: imageUrl })
       .select("id")
       .single();
-    if (error) throw error;
+    if (error) {
+      if (imagePath) {
+        const { error: cleanupError } = await supabase.storage.from("topic-images").remove([imagePath]);
+        if (cleanupError) {
+          throw new Error(`Could not create topic: ${error.message}. The uploaded image could not be removed: ${cleanupError.message}`);
+        }
+      }
+      throw error;
+    }
     await refreshForum();
     window.location.hash = `topic/${data.id}`;
-  }, [titleLabel]);
+  }, [titleLabel], true);
   form.addEventListener("submit", event => {
     if (!titleInput.value.trim()) {
       event.preventDefault();
@@ -560,11 +635,10 @@ profileForm.addEventListener("submit", async event => {
 
     let avatarUrl = null;
     if (avatarFile) {
-      const allowedTypes = ["image/jpeg", "image/gif", "image/webp"];
-      if (!allowedTypes.includes(avatarFile.type)) {
+      if (!allowedImageTypes.includes(avatarFile.type)) {
         throw new Error("Choose a JPG, GIF, or WebP image file.");
       }
-      if (avatarFile.size > 2 * 1024 * 1024) {
+      if (avatarFile.size > maxImageSize) {
         throw new Error("Profile picture files must be 2 MB or smaller.");
       }
 
