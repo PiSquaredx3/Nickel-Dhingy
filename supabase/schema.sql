@@ -199,7 +199,62 @@ create table if not exists public.topics (
 
 alter table public.topics
   add column if not exists image_url text,
-  add column if not exists is_pinned boolean not null default false;
+  add column if not exists is_pinned boolean not null default false,
+  add column if not exists is_featured boolean not null default false;
+
+create unique index if not exists topics_single_featured
+  on public.topics (is_featured)
+  where is_featured;
+
+create or replace function public.enforce_daily_question_topic_dates()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+declare
+  is_daily_question boolean;
+  was_daily_question boolean;
+begin
+  if tg_op = 'INSERT' then
+    select slug = 'question-of-the-day'
+    into is_daily_question
+    from public.boards
+    where id = new.board_id;
+    if is_daily_question then
+      new.created_at := now();
+    end if;
+    return new;
+  end if;
+
+  select slug = 'question-of-the-day'
+  into was_daily_question
+  from public.boards
+  where id = old.board_id;
+  select slug = 'question-of-the-day'
+  into is_daily_question
+  from public.boards
+  where id = new.board_id;
+
+  if was_daily_question or is_daily_question then
+    if old.board_id is distinct from new.board_id then
+      raise exception 'Daily question topics cannot be moved to another board.';
+    end if;
+    if old.created_at is distinct from new.created_at then
+      raise exception 'Daily question creation times cannot be changed.';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists enforce_daily_question_topic_dates on public.topics;
+create trigger enforce_daily_question_topic_dates
+  before insert on public.topics
+  for each row execute procedure public.enforce_daily_question_topic_dates();
+drop trigger if exists enforce_daily_question_topic_dates_on_update on public.topics;
+create trigger enforce_daily_question_topic_dates_on_update
+  before update of board_id, created_at on public.topics
+  for each row execute procedure public.enforce_daily_question_topic_dates();
 
 create table if not exists public.replies (
   id uuid primary key default gen_random_uuid(),
@@ -241,6 +296,30 @@ create trigger enforce_moderator_topic_pinning
   before update of is_pinned on public.topics
   for each row execute procedure public.prevent_non_moderator_topic_pin_change();
 
+create or replace function public.prevent_non_moderator_topic_feature_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.is_featured is distinct from old.is_featured
+    and not exists (
+      select 1 from public.moderators
+      where user_id = (select auth.uid())
+    )
+  then
+    raise exception 'Only moderators can feature or unfeature topics.';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists enforce_moderator_topic_featuring on public.topics;
+create trigger enforce_moderator_topic_featuring
+  before update of is_featured on public.topics
+  for each row execute procedure public.prevent_non_moderator_topic_feature_change();
+
 create or replace function public.set_topic_pinned(p_topic_id uuid, p_is_pinned boolean)
 returns void
 language plpgsql
@@ -267,6 +346,44 @@ $$;
 
 revoke all on function public.set_topic_pinned(uuid, boolean) from public, anon, authenticated;
 grant execute on function public.set_topic_pinned(uuid, boolean) to authenticated;
+
+create or replace function public.set_topic_featured(p_topic_id uuid, p_is_featured boolean)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not exists (
+    select 1 from public.moderators
+    where user_id = (select auth.uid())
+  ) then
+    raise exception 'Moderator access is required to feature or unfeature topics.';
+  end if;
+
+  lock table public.topics in share row exclusive mode;
+
+  if not exists (
+    select 1 from public.topics
+    where id = p_topic_id
+  ) then
+    raise exception 'This topic no longer exists.';
+  end if;
+
+  if p_is_featured then
+    update public.topics
+    set is_featured = false
+    where is_featured and id <> p_topic_id;
+  end if;
+
+  update public.topics
+  set is_featured = p_is_featured
+  where id = p_topic_id;
+end;
+$$;
+
+revoke all on function public.set_topic_featured(uuid, boolean) from public, anon, authenticated;
+grant execute on function public.set_topic_featured(uuid, boolean) to authenticated;
 
 create or replace view public.member_activity as
 with contributions as (
@@ -599,7 +716,8 @@ values
   ('music-discussion', 'Music Discussion', 'EVEN MORE BOARDS', 9),
   ('hobbies-projects', 'Hobbies & Projects', 'EVEN MORE BOARDS', 10),
   ('books-comics', 'Books & Comics', 'EVEN MORE BOARDS', 11),
-  ('rathner', 'Airmen Rathners Personal Poop Board', 'EVEN MORE BOARDS', 12)
+  ('rathner', 'Airmen Rathners Personal Poop Board', 'EVEN MORE BOARDS', 12),
+  ('question-of-the-day', 'Question of the Day', 'DAILY QUESTION', 13)
 on conflict (slug) do update set
   title = excluded.title,
   category = excluded.category,
@@ -706,19 +824,60 @@ create policy "Topics are publicly readable"
 drop policy if exists "Signed-in members can create topics as themselves" on public.topics;
 create policy "Signed-in members can create topics as themselves"
   on public.topics for insert to authenticated
-  with check ((select auth.uid()) = author_id);
+  with check (
+    (select auth.uid()) = author_id
+    and exists (
+      select 1
+      from public.boards
+      where id = board_id
+        and (
+          slug <> 'question-of-the-day'
+          or exists (
+            select 1 from public.moderators
+            where user_id = (select auth.uid())
+          )
+        )
+    )
+  );
 
 drop policy if exists "Members can edit their own topics" on public.topics;
 create policy "Members can edit their own topics"
   on public.topics for update to authenticated
-  using ((select auth.uid()) = author_id)
-  with check ((select auth.uid()) = author_id);
+  using (
+    (select auth.uid()) = author_id
+    and (
+      not exists (
+        select 1 from public.boards
+        where id = board_id and slug = 'question-of-the-day'
+      )
+      or created_at > now() - interval '24 hours'
+    )
+  )
+  with check (
+    (select auth.uid()) = author_id
+    and (
+      not exists (
+        select 1 from public.boards
+        where id = board_id and slug = 'question-of-the-day'
+      )
+      or created_at > now() - interval '24 hours'
+    )
+  );
 
 drop policy if exists "Members can delete their own topics" on public.topics;
 create policy "Members can delete their own topics"
   on public.topics for delete to authenticated
   using (
-    (select auth.uid()) = author_id
+    (
+      (select auth.uid()) = author_id
+      and (
+        not exists (
+          select 1 from public.boards
+          where id = board_id and slug = 'question-of-the-day'
+        )
+        or created_at > now() - interval '24 hours'
+      )
+    )
     or exists (
       select 1 from public.moderators
       where user_id = (select auth.uid())
@@ -733,19 +892,67 @@ create policy "Replies are publicly readable"
 drop policy if exists "Signed-in members can reply as themselves" on public.replies;
 create policy "Signed-in members can reply as themselves"
   on public.replies for insert to authenticated
-  with check ((select auth.uid()) = author_id);
+  with check (
+    (select auth.uid()) = author_id
+    and exists (
+      select 1
+      from public.topics
+      join public.boards on boards.id = topics.board_id
+      where topics.id = topic_id
+        and (
+          boards.slug <> 'question-of-the-day'
+          or topics.created_at > now() - interval '24 hours'
+        )
+    )
+  );
 
 drop policy if exists "Members can edit their own replies" on public.replies;
 create policy "Members can edit their own replies"
   on public.replies for update to authenticated
-  using ((select auth.uid()) = author_id)
-  with check ((select auth.uid()) = author_id);
+  using (
+    (select auth.uid()) = author_id
+    and exists (
+      select 1
+      from public.topics
+      join public.boards on boards.id = topics.board_id
+      where topics.id = topic_id
+        and (
+          boards.slug <> 'question-of-the-day'
+          or topics.created_at > now() - interval '24 hours'
+        )
+    )
+  )
+  with check (
+    (select auth.uid()) = author_id
+    and exists (
+      select 1
+      from public.topics
+      join public.boards on boards.id = topics.board_id
+      where topics.id = topic_id
+        and (
+          boards.slug <> 'question-of-the-day'
+          or topics.created_at > now() - interval '24 hours'
+        )
+    )
+  );
 
 drop policy if exists "Members can delete their own replies" on public.replies;
 create policy "Members can delete their own replies"
   on public.replies for delete to authenticated
   using (
-    (select auth.uid()) = author_id
+    (
+      (select auth.uid()) = author_id
+      and exists (
+        select 1
+        from public.topics
+        join public.boards on boards.id = topics.board_id
+        where topics.id = topic_id
+          and (
+            boards.slug <> 'question-of-the-day'
+            or topics.created_at > now() - interval '24 hours'
+          )
+      )
+    )
     or exists (
       select 1 from public.moderators
       where user_id = (select auth.uid())

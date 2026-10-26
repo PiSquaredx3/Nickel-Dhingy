@@ -48,6 +48,8 @@ let medalCaseRequest = 0;
 let membersRequest = 0;
 let boardTopicsRequest = 0;
 const membersPerPage = 25;
+const dailyQuestionBoardSlug = "question-of-the-day";
+const dailyQuestionDurationMs = 24 * 60 * 60 * 1000;
 
 const siteTitles = [
   "Another Retro Gaming Larping Forum",
@@ -478,7 +480,8 @@ async function loadStats() {
 
 async function loadLatestDiscussions() {
   const { data, error } = await supabase.from("topics")
-    .select("id,title,updated_at,profiles!topics_author_id_fkey(id,username),boards!topics_board_id_fkey(title)")
+    .select("id,title,is_featured,updated_at,profiles!topics_author_id_fkey(id,username),boards!topics_board_id_fkey(title)")
+    .order("is_featured", { ascending: false })
     .order("updated_at", { ascending: false })
     .limit(5);
   if (error) throw error;
@@ -492,6 +495,8 @@ async function loadLatestDiscussions() {
 
   for (const topic of data) {
     const item = document.createElement("li");
+    if (topic.is_featured) item.classList.add("latest-featured-topic");
+    if (topic.is_featured) item.append(makeElement("span", "featured-topic-badge", "Featured"));
     const link = makeElement("a", "latest-topic-title", topic.title);
     link.href = `#topic/${topic.id}`;
     item.append(
@@ -503,10 +508,41 @@ async function loadLatestDiscussions() {
   }
 }
 
+async function loadDailyQuestion() {
+  const container = document.querySelector("#daily-question");
+  const { data: topic, error } = await supabase.from("topics")
+    .select("id,title,created_at,boards!inner(slug)")
+    .eq("boards.slug", dailyQuestionBoardSlug)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+
+  container.replaceChildren();
+  if (!topic) {
+    container.append(makeElement("p", "latest-empty", "No question has been posted yet."));
+    return;
+  }
+
+  const link = makeElement("a", "daily-question-title", topic.title);
+  link.href = `#topic/${topic.id}`;
+  const closesAt = new Date(new Date(topic.created_at).getTime() + dailyQuestionDurationMs);
+  const isOpen = closesAt.getTime() > Date.now();
+  const status = makeElement("span", "daily-question-meta", isOpen
+    ? `Open for replies until ${formatDate(closesAt)}`
+    : "Replies are closed");
+  container.append(link, status);
+  if (isOpen) {
+    window.setTimeout(() => {
+      if (link.isConnected) status.textContent = "Replies are closed";
+    }, Math.max(0, closesAt.getTime() - Date.now()));
+  }
+}
+
 async function refreshForum() {
   setForumMessage("Loading the boards…");
   try {
-    await Promise.all([loadBoards(), loadStats(), loadLatestDiscussions()]);
+    await Promise.all([loadBoards(), loadStats(), loadLatestDiscussions(), loadDailyQuestion()]);
     setForumMessage("Board activity and counts are live from the forum database.");
   } catch (error) {
     console.error("Could not load forum data:", error);
@@ -616,10 +652,19 @@ async function showBoard(slug) {
   boardView.replaceChildren();
   appendBackLink(boardView);
   boardView.append(makeElement("h2", "view-title", board.title));
-  boardView.append(addSilkIcon(
-    makeButton("Start a topic", `compose:${board.slug}`, "primary-button"),
-    "comment-add"
-  ));
+  if (board.slug === dailyQuestionBoardSlug) {
+    boardView.append(makeElement(
+      "p",
+      "empty-state",
+      "A new question is posted by a moderator each day. Replies close 24 hours after the question is posted."
+    ));
+  }
+  if (board.slug !== dailyQuestionBoardSlug || moderatorIds.has(currentUser?.id)) {
+    boardView.append(addSilkIcon(
+      makeButton("Start a topic", `compose:${board.slug}`, "primary-button"),
+      "comment-add"
+    ));
+  }
   const sortControl = makeElement("label", "topic-sort-control");
   sortControl.append(document.createTextNode("Sort posts "));
   const sortSelect = makeElement("select", "topic-sort-select");
@@ -650,22 +695,35 @@ async function loadBoardTopics(board, list, sort) {
   list.replaceChildren(makeElement("p", "empty-state", "Loading topics…"));
   try {
     let query = supabase.from("topics")
-      .select("id,title,body,image_url,is_pinned,created_at,updated_at,profiles!topics_author_id_fkey(id,username),replies(count)")
+      .select("id,title,body,image_url,is_pinned,is_featured,created_at,updated_at,profiles!topics_author_id_fkey(id,username),replies(count)")
       .eq("board_id", board.id);
     if (sort === "day" || sort === "week") {
       const days = sort === "day" ? 1 : 7;
       query = query.gte("updated_at", new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString());
     }
     const { data, error } = await query
+      .order("is_featured", { ascending: false })
       .order("is_pinned", { ascending: false })
       .order("updated_at", { ascending: false })
       .range(0, 49);
     if (error) throw error;
     if (request !== boardTopicsRequest) return;
-    const awardsByPost = await loadPostAwards("topic", data.map(topic => topic.id));
+    let topics = data;
+    if (sort === "day" || sort === "week") {
+      const { data: featuredTopic, error: featuredError } = await supabase.from("topics")
+        .select("id,title,body,image_url,is_pinned,is_featured,created_at,updated_at,profiles!topics_author_id_fkey(id,username),replies(count)")
+        .eq("board_id", board.id)
+        .eq("is_featured", true)
+        .maybeSingle();
+      if (featuredError) throw featuredError;
+      if (featuredTopic && !topics.some(topic => topic.id === featuredTopic.id)) {
+        topics = [featuredTopic, ...topics].slice(0, 50);
+      }
+    }
+    const awardsByPost = await loadPostAwards("topic", topics.map(topic => topic.id));
     if (request !== boardTopicsRequest) return;
     list.replaceChildren();
-    if (!data.length) {
+    if (!topics.length) {
       list.append(makeElement(
         "p",
         "empty-state",
@@ -675,7 +733,7 @@ async function loadBoardTopics(board, list, sort) {
       ));
       return;
     }
-    for (const topic of data) {
+    for (const topic of topics) {
       const item = makeElement("article", "topic-list-item");
       const imageUrl = safeHttpsUrl(topic.image_url);
       if (imageUrl) {
@@ -694,6 +752,11 @@ async function loadBoardTopics(board, list, sort) {
       const details = makeElement("div", "topic-list-details");
       const title = makeElement("a", "topic-list-title", topic.title);
       title.href = `#topic/${topic.id}`;
+      if (topic.is_featured) {
+        const featuredLabel = makeElement("span", "featured-topic-badge", "Featured");
+        featuredLabel.setAttribute("aria-label", "Featured topic");
+        details.append(featuredLabel);
+      }
       if (topic.is_pinned) {
         const pinnedLabel = makeElement("span", "topic-pinned-badge", "Pinned");
         pinnedLabel.setAttribute("aria-label", "Pinned topic");
@@ -726,6 +789,15 @@ async function loadBoardTopics(board, list, sort) {
         );
         pinButton.title = topic.is_pinned ? "Unpin this topic" : "Pin this topic to the top of the board";
         details.append(pinButton);
+        const featureButton = makeButton(
+          topic.is_featured ? "Unfeature" : "Feature",
+          `moderate-feature-topic:${topic.id}:${topic.is_featured ? "false" : "true"}`,
+          "small-button moderation-feature"
+        );
+        featureButton.title = topic.is_featured
+          ? "Remove this topic from featured"
+          : "Feature this topic across the forum; it will replace the current featured topic";
+        details.append(featureButton);
       }
       item.append(details);
       list.append(item);
@@ -769,7 +841,7 @@ function safeHttpsUrl(value) {
   }
 }
 
-function renderPost(profile, date, body, className, imageUrl = null, activity = null, moderationAction = null, medals = null, award = null, postType = null, postId = null) {
+function renderPost(profile, date, body, className, imageUrl = null, activity = null, moderationAction = null, medals = null, award = null, postType = null, postId = null, isFeatured = false) {
   const post = makeElement("article", `forum-post ${className}`);
   const author = profile?.username || "member";
   const authorPanel = makeElement("aside", "post-author");
@@ -830,6 +902,17 @@ function renderPost(profile, date, body, className, imageUrl = null, activity = 
     deleteButton.title = "Remove this post";
     header.append(deleteButton);
   }
+  if (postType === "topic" && postId && moderatorIds.has(currentUser?.id)) {
+    const featureButton = makeButton(
+      isFeatured ? "Unfeature" : "Feature",
+      `moderate-feature-topic:${postId}:${isFeatured ? "false" : "true"}`,
+      "small-button moderation-feature"
+    );
+    featureButton.title = isFeatured
+      ? "Remove this topic from featured"
+      : "Feature this topic across the forum; it will replace the current featured topic";
+    header.append(featureButton);
+  }
   const postBody = makeElement("p", "post-body");
   appendPostBody(postBody, body);
   content.append(header, postBody);
@@ -859,7 +942,7 @@ async function showTopic(id) {
   try {
     const [{ data: topic, error: topicError }, { data: replies, error: replyError }] = await Promise.all([
       supabase.from("topics")
-        .select("id,board_id,title,body,image_url,created_at,profiles!topics_author_id_fkey(id,username,avatar_url,signature,profile_link)")
+        .select("id,board_id,title,body,image_url,is_featured,created_at,profiles!topics_author_id_fkey(id,username,avatar_url,signature,profile_link)")
         .eq("id", id)
         .maybeSingle(),
       supabase.from("replies")
@@ -881,9 +964,23 @@ async function showTopic(id) {
       loadPostAwards("reply", replyIds)
     ]);
     const board = boards.find(item => item.id === topic.board_id);
+    const isDailyQuestion = board?.slug === dailyQuestionBoardSlug;
+    const closesAt = isDailyQuestion
+      ? new Date(new Date(topic.created_at).getTime() + dailyQuestionDurationMs)
+      : null;
+    const isClosed = closesAt !== null && closesAt.getTime() <= Date.now();
     topicView.replaceChildren();
     appendBackLink(topicView, `← ${board?.title || "Forum index"}`);
     topicView.append(makeElement("h2", "view-title", topic.title));
+    if (isDailyQuestion) {
+      topicView.append(makeElement(
+        "p",
+        isClosed ? "daily-question-closed" : "daily-question-open",
+        isClosed
+          ? "This daily question is now read-only. Replies closed 24 hours after it was posted."
+          : `Replies are open until ${formatDate(closesAt)}.`
+      ));
+    }
     topicView.append(renderPost(
       topic.profiles,
       topic.created_at,
@@ -895,7 +992,8 @@ async function showTopic(id) {
       medalsByUser.get(topic.profiles?.id),
       topicAwards.get(`topic:${topic.id}`),
       "topic",
-      topic.id
+      topic.id,
+      topic.is_featured
     ));
     for (const reply of replies) {
       topicView.append(renderPost(
@@ -913,7 +1011,9 @@ async function showTopic(id) {
       ));
     }
 
-    if (currentUser) {
+    if (isClosed) {
+      topicView.append(makeElement("p", "empty-state", "This conversation is read-only."));
+    } else if (currentUser) {
       const replyForm = makePostForm("Write a reply", "Post reply", async body => {
         const { error } = await supabase.from("replies").insert({
           topic_id: topic.id,
@@ -929,6 +1029,11 @@ async function showTopic(id) {
       const prompt = makeElement("p", "empty-state", "Sign in to reply to this conversation.");
       prompt.append(" ", makeButton("Log in", "auth-login"));
       topicView.append(prompt);
+    }
+    if (isDailyQuestion && !isClosed) {
+      window.setTimeout(() => {
+        if (window.location.hash === `#topic/${topic.id}`) void showTopic(topic.id);
+      }, Math.max(0, closesAt.getTime() - Date.now()));
     }
   } catch (error) {
     console.error("Could not load topic:", error);
@@ -1042,6 +1147,11 @@ function showComposer(slug) {
   }
   if (!currentUser) {
     openAuth("signup");
+    return;
+  }
+  if (board.slug === dailyQuestionBoardSlug && !moderatorIds.has(currentUser.id)) {
+    setForumMessage("Only moderators can post the daily question.", true);
+    window.location.hash = `board/${encodeURIComponent(board.slug)}`;
     return;
   }
 
@@ -1362,6 +1472,18 @@ async function runModerationAction(action) {
       if (error) throw error;
       const route = decodeURIComponent(window.location.hash.slice(1));
       if (route.startsWith("board/")) await showBoard(route.slice("board/".length));
+    } else if (action.startsWith("moderate-feature-topic:")) {
+      if (!moderatorIds.has(currentUser?.id)) throw new Error("Moderator access is required.");
+      const [, topicId, featuredValue] = action.split(":");
+      const { error } = await supabase.rpc("set_topic_featured", {
+        p_topic_id: topicId,
+        p_is_featured: featuredValue === "true"
+      });
+      if (error) throw error;
+      await refreshForum();
+      const route = decodeURIComponent(window.location.hash.slice(1));
+      if (route.startsWith("board/")) await showBoard(route.slice("board/".length));
+      else if (route.startsWith("topic/")) await showTopic(route.slice("topic/".length));
     }
   } catch (error) {
     console.error("Could not complete moderation action:", error);
@@ -1414,7 +1536,7 @@ document.addEventListener("click", event => {
     } else {
       openAuth("signup");
     }
-  } else if (action.startsWith("moderate-delete-") || action.startsWith("moderate-pin-topic:")) {
+  } else if (action.startsWith("moderate-delete-") || action.startsWith("moderate-pin-topic:") || action.startsWith("moderate-feature-topic:")) {
     void runModerationAction(action);
   } else if (action.startsWith("vote:")) {
     void runVoteAction(action);
@@ -1498,6 +1620,7 @@ authForm.addEventListener("submit", async event => {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
       authDialog.close();
+      handleRoute();
     }
   } catch (error) {
     console.error("Authentication request failed:", error);
@@ -1519,6 +1642,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
   boardList.append(row);
   document.querySelector("#latest-discussions")
     .replaceChildren(makeElement("li", "latest-empty", "Recent discussions will appear after forum setup."));
+  document.querySelector("#daily-question")
+    .replaceChildren(makeElement("p", "latest-empty", "Today’s question will appear after forum setup."));
   setForumMessage("No sample posts or statistics are shown. This forum will display live activity after setup.");
   handleRoute();
 } else {

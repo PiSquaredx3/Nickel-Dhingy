@@ -446,6 +446,59 @@ button:active {
   margin: 0;
 }
 
+.featured-topic-badge {
+  display: inline-block;
+  margin: 0 5px 3px 0;
+  padding: 2px 5px;
+  border: 1px solid #947746;
+  background: #3b3540;
+  color: #f2c36a;
+  font-size: 9px;
+  font-weight: bold;
+  text-transform: uppercase;
+  vertical-align: 1px;
+}
+
+.latest-featured-topic {
+  background: rgba(119, 91, 51, 0.12);
+}
+
+.daily-question-title {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.daily-question-meta,
+.daily-question-archive {
+  display: block;
+  margin-top: 5px;
+  color: #9dabb9;
+  font-size: 10px;
+}
+
+.daily-question-archive {
+  padding-top: 7px;
+  border-top: 1px dotted #445267;
+}
+
+.daily-question-open,
+.daily-question-closed {
+  margin: 8px 0;
+  padding: 8px 10px;
+  border: 1px solid #536a79;
+  background: rgba(68, 115, 131, 0.18);
+  color: #b9dce6;
+  font-size: 11px;
+}
+
+.daily-question-closed {
+  border-color: #6b5a43;
+  background: rgba(119, 91, 51, 0.18);
+  color: #e2c999;
+}
+
 .bulletin {
   display: flex;
   gap: 9px;
@@ -807,6 +860,12 @@ button:active {
   font-size: 9px;
   font-weight: bold;
   text-transform: uppercase;
+}
+
+.moderation-feature {
+  margin: 5px 5px 0 0;
+  border-color: #947746;
+  color: #f2c36a;
 }
 
 .moderation-pin {
