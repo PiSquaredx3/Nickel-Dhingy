@@ -74,10 +74,29 @@ button:active {
 }
 
 .masthead {
+  position: relative;
+  isolation: isolate;
   padding: 21px 28px 0;
   background: linear-gradient(180deg, #283548 0%, #1b2637 63%, #111b2a 100%);
   border-bottom: 1px solid #0a111b;
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.16);
+}
+
+.masthead::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 130%, rgba(69, 112, 164, 0.28) 0 4%, transparent 4.5%),
+    repeating-conic-gradient(
+      from -90deg at 50% 130%,
+      rgba(69, 112, 164, 0.24) 0deg 4deg,
+      rgba(69, 112, 164, 0.035) 4deg 8deg
+    );
+  -webkit-mask-image: radial-gradient(ellipse 72% 150% at 50% 130%, #000 18%, transparent 100%);
+  mask-image: radial-gradient(ellipse 72% 150% at 50% 130%, #000 18%, transparent 100%);
+  content: "";
+  pointer-events: none;
 }
 
 .masthead-top {
