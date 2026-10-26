@@ -523,18 +523,20 @@ begin
     raise exception 'Your account must be at least 14 days old to vote.';
   end if;
 
-  vote_day_start := date_trunc('day', now() at time zone 'UTC') at time zone 'UTC';
-  select count(*)::integer into daily_vote_count
-  from public.post_votes
-  where voter_id = voter_user_id and created_at >= vote_day_start;
-
-  if daily_vote_count >= 3 then
-    raise exception 'You have reached the limit of 3 votes for today.';
-  end if;
-
   select exists (
     select 1 from public.moderators where user_id = voter_user_id
   ) into voter_is_moderator;
+
+  if not voter_is_moderator then
+    vote_day_start := date_trunc('day', now() at time zone 'UTC') at time zone 'UTC';
+    select count(*)::integer into daily_vote_count
+    from public.post_votes
+    where voter_id = voter_user_id and created_at >= vote_day_start;
+
+    if daily_vote_count >= 3 then
+      raise exception 'You have reached the limit of 3 votes for today.';
+    end if;
+  end if;
 
   select exists (
     select 1 from public.profiles where id = voter_user_id and username = 'pi_'

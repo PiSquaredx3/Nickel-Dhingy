@@ -288,14 +288,39 @@ function appendMemberMedalStars(container, medals) {
     if (!count) continue;
     description.push(`${count} ${name}`);
     for (let index = 0; index < count; index += 1) {
-      const badge = makeMedalBadge(name, className);
-      stars.append(badge);
+      stars.append(makeMedalBadge(name, className));
     }
   }
+  const label = `Member medals: ${description.join(", ")}`;
   stars.setAttribute("role", "img");
-  stars.setAttribute("aria-label", `Member medals: ${description.join(", ")}`);
-  stars.title = `Member medals: ${description.join(", ")}`;
+  stars.setAttribute("aria-label", label);
+  stars.title = label;
   container.append(stars);
+}
+
+function appendPostAwardBadges(container, award) {
+  if (!award) return;
+  const tiers = [
+    ["Bronze", "medal-bronze", award.bronze_count || 0],
+    ["Silver", "medal-silver", award.silver_awarded ? 1 : 0],
+    ["Gold", "medal-gold", award.gold_awarded ? 1 : 0]
+  ];
+  const earned = tiers.filter(([, , count]) => count > 0);
+  if (!earned.length) return;
+
+  const badges = makeElement("span", "post-award-badges");
+  const description = `Post medals: ${earned.map(([name, , count]) =>
+    `${count} ${name} medal${count === 1 ? "" : "s"}`
+  ).join(", ")}`;
+  badges.setAttribute("role", "img");
+  badges.setAttribute("aria-label", description);
+  badges.title = description;
+  for (const [name, className, count] of earned) {
+    for (let index = 0; index < count; index += 1) {
+      badges.append(makeMedalBadge(name, className));
+    }
+  }
+  container.append(badges);
 }
 
 function setStat(name, value) {
@@ -637,9 +662,6 @@ async function loadBoardTopics(board, list, sort) {
     if (request !== boardTopicsRequest) return;
     const awardsByPost = await loadPostAwards("topic", data.map(topic => topic.id));
     if (request !== boardTopicsRequest) return;
-    const authorIds = data.map(topic => topic.profiles?.id);
-    const medalsByUser = await loadMemberMedals(authorIds);
-    if (request !== boardTopicsRequest) return;
     list.replaceChildren();
     if (!data.length) {
       list.append(makeElement(
@@ -679,12 +701,21 @@ async function loadBoardTopics(board, list, sort) {
       const voteCount = awardsByPost.get(`topic:${topic.id}`)?.vote_count || 0;
       const rating = makeElement("span", "topic-vote-rating", `${voteCount} ${voteCount === 1 ? "vote" : "votes"}`);
       rating.setAttribute("aria-label", `Rating: ${voteCount} ${voteCount === 1 ? "vote" : "votes"}`);
-      details.append(rating);
+      const postAwards = awardsByPost.get(`topic:${topic.id}`);
+      const goldAwards = postAwards?.gold_awarded
+        ? { gold_awarded: true }
+        : null;
+      const voteSummary = makeElement("span", "topic-vote-summary");
+      voteSummary.append(rating);
+      appendPostAwardBadges(voteSummary, goldAwards);
+      details.append(voteSummary);
       const replyCount = topic.replies?.[0]?.count || 0;
-      details.append(
-        makeElement("p", "topic-meta", `${topic.profiles?.username || "member"} · ${formatDate(topic.updated_at)} · ${replyCount} replies`),
-        makeElement("p", "topic-preview", topic.body)
-      );
+      const metadata = makeElement("p", "topic-meta");
+      metadata.append(document.createTextNode(`${topic.profiles?.username || "member"} · ${formatDate(topic.updated_at)} · ${replyCount} replies`));
+      if (moderatorIds.has(topic.profiles?.id)) {
+        metadata.append(document.createTextNode(" "), makeModeratorBadge());
+      }
+      details.append(metadata, makeElement("p", "topic-preview", topic.body));
       if (moderatorIds.has(currentUser?.id)) {
         const pinButton = makeButton(
           topic.is_pinned ? "Unpin" : "Pin",
@@ -694,7 +725,6 @@ async function loadBoardTopics(board, list, sort) {
         pinButton.title = topic.is_pinned ? "Unpin this topic" : "Pin this topic to the top of the board";
         details.append(pinButton);
       }
-      appendMemberLabels(details, topic.profiles?.id, medalsByUser.get(topic.profiles?.id));
       item.append(details);
       list.append(item);
     }
@@ -746,6 +776,7 @@ function renderPost(profile, date, body, className, imageUrl = null, activity = 
     joinedDate.dateTime = activity.joined_at;
     authorPanel.append(joinedDate);
   }
+  appendMemberMedalStars(authorPanel, medals);
   const avatar = makeElement("div", "post-avatar", author.slice(0, 1).toUpperCase());
   const avatarUrl = safeHttpsUrl(profile?.avatar_url);
   if (avatarUrl) {
@@ -757,7 +788,6 @@ function renderPost(profile, date, body, className, imageUrl = null, activity = 
     image.addEventListener("error", () => image.remove(), { once: true });
     avatar.append(image);
   }
-  appendMemberMedalStars(authorPanel, medals);
   authorPanel.append(avatar, makeElement("strong", "post-author-name", author));
   appendMemberLabels(authorPanel, profile?.id, null);
 
@@ -777,6 +807,10 @@ function renderPost(profile, date, body, className, imageUrl = null, activity = 
   const header = makeElement("div", "post-header");
   header.append(makeElement("time", "", formatDate(date)));
   if (award && postType && postId) {
+    const voteGroup = makeElement("span", "post-vote-group");
+    if (postType === "topic") {
+      appendPostAwardBadges(voteGroup, award);
+    }
     const voteButton = makeButton(
       award.voted_by_user ? `Voted · ${award.vote_count}` : `Vote · ${award.vote_count}`,
       `vote:${postType}:${postId}`,
@@ -786,7 +820,8 @@ function renderPost(profile, date, body, className, imageUrl = null, activity = 
       voteButton.disabled = true;
       if (profile?.id === currentUser?.id) voteButton.title = "You cannot vote on your own post.";
     }
-    header.append(voteButton);
+    voteGroup.append(voteButton);
+    header.append(voteGroup);
   }
   if (moderationAction && moderatorIds.has(currentUser?.id)) {
     const deleteButton = makeButton("Delete", moderationAction, "small-button moderation-delete");
