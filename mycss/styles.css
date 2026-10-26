@@ -1148,6 +1148,10 @@ button:active {
   margin-top: 11px;
 }
 
+.dialog-card [hidden] {
+  display: none !important;
+}
+
 .dialog-card .primary-button {
   width: 100%;
 }

@@ -13,7 +13,11 @@ const profileMessage = document.querySelector("#profile-message");
 const authForm = document.querySelector("#auth-form");
 const authMessage = document.querySelector("#auth-message");
 const usernameField = document.querySelector("#username-field");
+const emailField = authForm.elements.email.closest(".form-field");
+const passwordField = authForm.elements.password.closest(".form-field");
 const authPassword = authForm.elements.password;
+const authForgot = document.querySelector("#auth-forgot");
+const authSwitch = document.querySelector("#auth-switch");
 const siteTitle = document.querySelector(".site-title");
 const medalCaseStatus = document.querySelector("#medal-case-status");
 const medalShelves = document.querySelector("#medal-shelves");
@@ -823,18 +827,46 @@ function handleRoute() {
 function openAuth(mode) {
   authMode.value = mode;
   const signingUp = mode === "signup";
-  document.querySelector("#auth-title").textContent = signingUp ? "Join the forum" : "Welcome back";
+  const requestingReset = mode === "reset-request";
+  const updatingPassword = mode === "reset-update";
+  document.querySelector("#auth-title").textContent = signingUp
+    ? "Join the forum"
+    : requestingReset
+      ? "Reset your password"
+      : updatingPassword
+        ? "Choose a new password"
+        : "Welcome back";
   document.querySelector("#auth-description").textContent = signingUp
     ? "Create an account to start posting."
-    : "Log in to continue the conversation.";
-  document.querySelector("#auth-submit").textContent = signingUp ? "Create account" : "Log in";
-  document.querySelector("#auth-switch").textContent = signingUp ? "Already a member? Log in" : "Need an account? Sign up";
+    : requestingReset
+      ? "Enter your account email and we’ll send a password reset link."
+      : updatingPassword
+        ? "Choose a new password for your account."
+        : "Log in to continue the conversation.";
+  document.querySelector("#auth-submit").textContent = signingUp
+    ? "Create account"
+    : requestingReset
+      ? "Send reset link"
+      : updatingPassword
+        ? "Save new password"
+        : "Log in";
   usernameField.hidden = !signingUp;
+  emailField.hidden = updatingPassword;
+  authForm.elements.email.required = !updatingPassword;
+  passwordField.hidden = requestingReset;
+  authPassword.required = !requestingReset;
   authForm.elements.username.required = signingUp;
-  authPassword.autocomplete = signingUp ? "new-password" : "current-password";
+  authPassword.autocomplete = signingUp || updatingPassword ? "new-password" : "current-password";
+  authForgot.hidden = signingUp || requestingReset || updatingPassword;
+  authSwitch.hidden = updatingPassword;
+  authSwitch.textContent = requestingReset
+    ? "Back to log in"
+    : signingUp
+      ? "Already a member? Log in"
+      : "Need an account? Sign up";
   authMessage.textContent = "";
   authMessage.classList.remove("error-message");
-  authDialog.showModal();
+  if (!authDialog.open) authDialog.showModal();
 }
 
 async function openProfile() {
@@ -1091,7 +1123,15 @@ document.querySelectorAll("[data-close-dialog]").forEach(button => {
 
 document.querySelector("[data-close-profile]").addEventListener("click", () => profileDialog.close());
 
-document.querySelector("#auth-switch").addEventListener("click", () => {
+authForgot.addEventListener("click", () => {
+  openAuth("reset-request");
+});
+
+authSwitch.addEventListener("click", () => {
+  if (authMode.value === "reset-request") {
+    openAuth("login");
+    return;
+  }
   openAuth(authMode.value === "signup" ? "login" : "signup");
 });
 
@@ -1103,7 +1143,18 @@ authForm.addEventListener("submit", async event => {
   try {
     const email = authForm.elements.email.value.trim();
     const password = authPassword.value;
-    if (authMode.value === "signup") {
+    if (authMode.value === "reset-request") {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}${window.location.pathname}`
+      });
+      if (error) throw error;
+      authMessage.textContent = "If an account exists for that email, a password reset link has been sent.";
+    } else if (authMode.value === "reset-update") {
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) throw error;
+      authDialog.close();
+      setForumMessage("Your password has been reset. You are now logged in.");
+    } else if (authMode.value === "signup") {
       const username = authForm.elements.username.value.trim().toLowerCase();
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -1126,7 +1177,7 @@ authForm.addEventListener("submit", async event => {
       authDialog.close();
     }
   } catch (error) {
-    console.error("Authentication failed:", error);
+    console.error("Authentication request failed:", error);
     authMessage.textContent = error.message;
     authMessage.classList.add("error-message");
   } finally {
@@ -1151,10 +1202,15 @@ if (!supabaseUrl || !supabaseAnonKey) {
   try {
     const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
     supabase = createClient(supabaseUrl, supabaseAnonKey);
+    supabase.auth.onAuthStateChange(event => {
+      if (event === "PASSWORD_RECOVERY") {
+        openAuth("reset-update");
+      }
+    });
     await loadModerators();
     const { data: { session } } = await supabase.auth.getSession();
     updateAccount(session?.user || null);
-    supabase.auth.onAuthStateChange((_event, nextSession) => {
+    supabase.auth.onAuthStateChange((event, nextSession) => {
       updateAccount(nextSession?.user || null);
     });
     await refreshForum();
