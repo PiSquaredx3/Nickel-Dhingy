@@ -464,29 +464,65 @@ update public.boards
 set position = (select coalesce(max(position), 0) + 1 from public.boards)
 where slug = 'rathner';
 
+update public.boards
+set slug = case slug
+  when 'dos-windows' then 'general'
+  when 'adventure-games' then 'clips-images'
+  when 'simulations' then 'art'
+  when 'shareware' then 'games-recommendations'
+  when 'nintendo-classics' then 'nintendo'
+  when 'playstation-classics' then 'playstation'
+  when 'xbox-classics' then 'xbox'
+  when 'sega-other-classics' then 'sega-other-consoles'
+  when 'off-topic' then 'general-2'
+  when 'music' then 'music-discussion'
+  else slug
+end
+where slug in (
+  'dos-windows', 'adventure-games', 'simulations', 'shareware',
+  'nintendo-classics', 'playstation-classics', 'xbox-classics',
+  'sega-other-classics', 'off-topic', 'music'
+);
+
 insert into public.boards (slug, title, category, position)
 values
-  ('dos-windows', 'Main Board', 'BOARDS', 1),
-  ('adventure-games', 'Clips & Images', 'BOARDS', 2),
-  ('rpg-strategy', 'Help & Tech', 'BOARDS', 3),
-  ('action-shooters', 'Multiplayer & LAN', 'BOARDS', 4),
-  ('simulations', 'Mods & Creations', 'BOARDS', 5),
-  ('shareware', 'Games & Recommendations', 'BOARDS', 6),
-  ('nintendo-classics', 'Nintendo', 'EVEN MORE BOARDS', 7),
-  ('playstation-classics', 'PlayStation', 'EVEN MORE BOARDS', 8),
-  ('xbox-classics', 'Xbox', 'EVEN MORE BOARDS', 9),
-  ('sega-other-classics', 'Sega & Other Consoles', 'EVEN MORE BOARDS', 10),
-  ('off-topic', 'Off-Topic & Miscellaneous', 'NON-GAMING BOARDS', 11),
-  ('music', 'Music Discussion', 'NON-GAMING BOARDS', 12),
-  ('movies-tv', 'Movies & TV', 'NON-GAMING BOARDS', 13),
-  ('hobbies-projects', 'Hobbies & Projects', 'NON-GAMING BOARDS', 14),
-  ('art-projects', 'Art & Art Adjacent', 'NON-GAMING BOARDS', 15),
-  ('books-comics', 'Books & Comics', 'NON-GAMING BOARDS', 16),
-  ('rathner', 'Airmen Rathners Personal Poop Board', 'NON-GAMING BOARDS', 99)
+  ('general', 'General', 'BOARDS', 1),
+  ('clips-images', 'Clips & Images', 'BOARDS', 2),
+  ('art', 'Art', 'BOARDS', 3),
+  ('games-recommendations', 'Games & Recommendations', 'BOARDS', 4),
+  ('general-2', 'General 2', 'EVEN MORE BOARDS', 5),
+  ('lolwhat', 'lolwhat', 'EVEN MORE BOARDS', 6),
+  ('anime', 'Anime', 'EVEN MORE BOARDS', 7),
+  ('movies-tv', 'Movies & TV', 'EVEN MORE BOARDS', 8),
+  ('music-discussion', 'Music Discussion', 'EVEN MORE BOARDS', 9),
+  ('hobbies-projects', 'Hobbies & Projects', 'EVEN MORE BOARDS', 10),
+  ('books-comics', 'Books & Comics', 'EVEN MORE BOARDS', 11),
+  ('rathner', 'Airmen Rathners Personal Poop Board', 'EVEN MORE BOARDS', 12)
 on conflict (slug) do update set
   title = excluded.title,
   category = excluded.category,
   position = excluded.position;
+
+update public.topics
+set board_id = (select id from public.boards where slug = 'art')
+where board_id = (select id from public.boards where slug = 'art-projects');
+
+update public.topics
+set board_id = (select id from public.boards where slug = 'general-2')
+where board_id in (
+  select id
+  from public.boards
+  where lower(btrim(title)) in ('tech & internet', 'food & drink')
+);
+
+delete from public.boards
+where slug in (
+  'art-projects', 'rpg-strategy', 'action-shooters',
+  'nintendo', 'playstation', 'xbox', 'sega-other-consoles'
+);
+
+delete from public.boards
+where lower(btrim(title)) in ('tech & internet', 'food & drink');
 
 create or replace function public.create_profile_for_new_user()
 returns trigger

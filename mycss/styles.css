@@ -689,6 +689,74 @@ button:active {
   border-bottom: 0;
 }
 
+.member-list {
+  display: grid;
+  gap: 5px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: none;
+}
+
+.member-list-item {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px 10px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid #344357;
+  background: #202d40;
+}
+
+.member-number {
+  color: #e9bb65;
+  font-size: 11px;
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+}
+
+.member-list-name {
+  min-width: 0;
+  color: #8dd7f2;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.member-list-date {
+  color: #8998aa;
+  font-size: 10px;
+}
+
+.member-list-item .member-labels {
+  grid-column: 2 / -1;
+  margin-top: 0;
+}
+
+.member-list-summary {
+  margin: 0;
+  color: #9dabb9;
+  font-size: 11px;
+}
+
+.member-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.member-pagination a {
+  text-decoration: none;
+}
+
+.member-page-count {
+  color: #aab7c6;
+  font-size: 11px;
+}
+
 .topic-list-title {
   font-size: 12px;
   font-weight: bold;

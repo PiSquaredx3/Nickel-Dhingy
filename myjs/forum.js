@@ -5,6 +5,8 @@ const forumMessage = document.querySelector("#forum-message");
 const boardView = document.querySelector("#board-view");
 const topicView = document.querySelector("#topic-view");
 const composerView = document.querySelector("#composer-view");
+const membersView = document.querySelector("#members-view");
+const navLinks = document.querySelectorAll("[data-page-nav]");
 const indexPanel = document.querySelector(".forum-table-wrap");
 const authDialog = document.querySelector("#auth-dialog");
 const profileDialog = document.querySelector("#profile-dialog");
@@ -22,11 +24,29 @@ const siteTitle = document.querySelector(".site-title");
 const medalCaseStatus = document.querySelector("#medal-case-status");
 const medalShelves = document.querySelector("#medal-shelves");
 const authMode = { value: "signup" };
+const legacyBoardSlugs = {
+  "dos-windows": "general",
+  "adventure-games": "clips-images",
+  simulations: "art",
+  shareware: "games-recommendations",
+  "nintendo-classics": "games-recommendations",
+  "playstation-classics": "games-recommendations",
+  "xbox-classics": "games-recommendations",
+  "sega-other-classics": "games-recommendations",
+  nintendo: "games-recommendations",
+  playstation: "games-recommendations",
+  xbox: "games-recommendations",
+  "sega-other-consoles": "games-recommendations",
+  "off-topic": "general-2",
+  music: "music-discussion"
+};
 let supabase;
 let currentUser;
 let boards = [];
 let moderatorIds = new Set();
 let medalCaseRequest = 0;
+let membersRequest = 0;
+const membersPerPage = 25;
 
 const siteTitles = [
   "Another Retro Gaming Larping Forum",
@@ -466,7 +486,85 @@ function appendBackLink(container, label = "← Forum index") {
   container.append(back);
 }
 
+async function showMembers(pageNumber = 1) {
+  const request = ++membersRequest;
+  const page = Math.max(1, Number.parseInt(pageNumber, 10) || 1);
+  indexPanel.hidden = true;
+  boardView.hidden = true;
+  topicView.hidden = true;
+  composerView.hidden = true;
+  membersView.hidden = false;
+  membersView.replaceChildren(
+    makeElement("h2", "view-title", "Members"),
+    makeElement("p", "empty-state", "Loading members…")
+  );
+
+  try {
+    const start = (page - 1) * membersPerPage;
+    const { data, count, error } = await supabase.from("profiles")
+      .select("id,username,created_at", { count: "exact" })
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(start, start + membersPerPage - 1);
+    if (error) throw error;
+    if (request !== membersRequest) return;
+
+    const totalPages = Math.max(1, Math.ceil((count || 0) / membersPerPage));
+    if (page > totalPages) {
+      window.location.hash = `members/${totalPages}`;
+      return;
+    }
+
+    const medalsByUser = await loadMemberMedals(data.map(member => member.id));
+    if (request !== membersRequest) return;
+    const list = makeElement("ol", "member-list");
+    list.start = start + 1;
+    if (!data.length) {
+      list.append(makeElement("li", "empty-state", "No members have joined yet."));
+    }
+    for (const [index, member] of data.entries()) {
+      const item = makeElement("li", "member-list-item");
+      const memberNumber = makeElement("span", "member-number", `#${start + index + 1}`);
+      const memberName = makeElement("strong", "member-list-name", member.username);
+      const joinedDate = makeElement("time", "member-list-date", `Joined ${formatDateOnly(member.created_at)}`);
+      joinedDate.dateTime = member.created_at;
+      item.append(memberNumber, memberName, joinedDate);
+      appendMemberLabels(item, member.id, medalsByUser.get(member.id));
+      list.append(item);
+    }
+
+    const pagination = makeElement("nav", "member-pagination");
+    pagination.setAttribute("aria-label", "Member list pages");
+    if (page > 1) {
+      const previous = makeElement("a", "small-button", "← Previous");
+      previous.href = `#members/${page - 1}`;
+      pagination.append(previous);
+    }
+    pagination.append(makeElement("span", "member-page-count", `Page ${page} of ${totalPages}`));
+    if (page < totalPages) {
+      const next = makeElement("a", "small-button", "Next →");
+      next.href = `#members/${page + 1}`;
+      pagination.append(next);
+    }
+
+    membersView.replaceChildren(
+      makeElement("h2", "view-title", "Members"),
+      makeElement("p", "member-list-summary", `${(count || 0).toLocaleString()} members · numbered by join date`),
+      list,
+      pagination
+    );
+  } catch (error) {
+    if (request !== membersRequest) return;
+    console.error("Could not load members:", error);
+    membersView.replaceChildren(
+      makeElement("h2", "view-title", "Members"),
+      makeElement("p", "form-message error-message", `Could not load members: ${error.message}`)
+    );
+  }
+}
+
 async function showBoard(slug) {
+  membersView.hidden = true;
   const board = boards.find(item => item.slug === slug);
   if (!board) {
     setForumMessage("That board could not be found.", true);
@@ -658,6 +756,7 @@ function renderPost(profile, date, body, className, imageUrl = null, activity = 
 }
 
 async function showTopic(id) {
+  membersView.hidden = true;
   topicView.hidden = false;
   boardView.hidden = true;
   composerView.hidden = true;
@@ -842,6 +941,7 @@ function makePostForm(heading, submitLabel, onSubmit, leadingFields = [], includ
 }
 
 function showComposer(slug) {
+  membersView.hidden = true;
   const board = boards.find(item => item.slug === slug);
   if (!board) {
     setForumMessage("That board could not be found.", true);
@@ -915,17 +1015,39 @@ function showComposer(slug) {
 
 function handleRoute() {
   const route = decodeURIComponent(window.location.hash.slice(1));
+  const isMembersPage = route === "members" || route.startsWith("members/");
+  navLinks.forEach(link => {
+    const active = link.dataset.pageNav === (isMembersPage ? "members" : "forums");
+    link.classList.toggle("active", active);
+    if (active) link.setAttribute("aria-current", "page");
+    else link.removeAttribute("aria-current");
+  });
   if (route.startsWith("board/")) {
-    showBoard(route.slice("board/".length));
+    const slug = route.slice("board/".length);
+    const canonicalSlug = legacyBoardSlugs[slug];
+    if (canonicalSlug) {
+      window.location.hash = `board/${encodeURIComponent(canonicalSlug)}`;
+      return;
+    }
+    showBoard(slug);
   } else if (route.startsWith("topic/")) {
     showTopic(route.slice("topic/".length));
   } else if (route.startsWith("compose/")) {
-    showComposer(route.slice("compose/".length));
+    const slug = route.slice("compose/".length);
+    const canonicalSlug = legacyBoardSlugs[slug];
+    if (canonicalSlug) {
+      window.location.hash = `compose/${encodeURIComponent(canonicalSlug)}`;
+      return;
+    }
+    showComposer(slug);
+  } else if (isMembersPage) {
+    showMembers(route.startsWith("members/") ? route.slice("members/".length) : 1);
   } else {
     indexPanel.hidden = false;
     boardView.hidden = true;
     topicView.hidden = true;
     composerView.hidden = true;
+    membersView.hidden = true;
   }
 }
 
