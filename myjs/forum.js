@@ -184,13 +184,28 @@ function appendMemberLabels(container, userId, medals) {
     ["Gold", "medal-gold", medals?.gold_count]
   ]) {
     if (!count) continue;
-    const badge = makeElement("span", `medal-badge ${className}`, `${name} ×${count}`);
+    const badge = makeMedalBadge(name, className);
+    badge.append(makeElement("span", "medal-count", `×${count}`));
     badge.title = `${count} post${count === 1 ? "" : "s"} earned this medal`;
     labels.append(badge);
     hasLabels = true;
   }
 
   if (hasLabels) container.append(labels);
+}
+
+function makeMedalBadge(name, className) {
+  const badge = makeElement("span", `medal-badge ${className}`);
+  badge.setAttribute("role", "img");
+  badge.setAttribute("aria-label", `${name} medal`);
+  badge.title = `${name} medal`;
+  const icon = document.createElement("img");
+  icon.className = `medal-inline-icon ${className.replace("medal-", "medal-icon-")}`;
+  icon.src = "assets/silk-icons/star.png";
+  icon.alt = "";
+  icon.setAttribute("aria-hidden", "true");
+  badge.append(icon);
+  return badge;
 }
 
 function appendPostAwardBadges(container, award) {
@@ -201,7 +216,7 @@ function appendPostAwardBadges(container, award) {
     ["Silver", "medal-silver", award.silver_awarded],
     ["Gold", "medal-gold", award.gold_awarded]
   ]) {
-    if (earned) badges.append(makeElement("span", `medal-badge ${className}`, name));
+    if (earned) badges.append(makeMedalBadge(name, className));
   }
   if (badges.childElementCount) container.append(badges);
 }

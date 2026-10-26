@@ -738,6 +738,29 @@ button:active {
   text-transform: uppercase;
 }
 
+.medal-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  line-height: 1;
+}
+
+.medal-inline-icon {
+  display: block;
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
+.medal-count {
+  color: #d9e0e9;
+  font-size: 9px;
+  line-height: 1;
+}
+
 .medal-bronze {
   border-color: #9c7048;
   background: #453326;
@@ -754,6 +777,14 @@ button:active {
   border-color: #b18b45;
   background: #4a3c25;
   color: #f4d17b;
+}
+
+.medal-badge.medal-bronze,
+.medal-badge.medal-silver,
+.medal-badge.medal-gold {
+  border: 0;
+  background: transparent;
+  color: inherit;
 }
 
 .medal-case {

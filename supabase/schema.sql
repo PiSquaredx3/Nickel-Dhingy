@@ -215,6 +215,19 @@ create index if not exists post_votes_voter_created_at
 
 alter table public.post_votes enable row level security;
 
+create table if not exists public.post_voting_settings (
+  singleton boolean primary key default true check (singleton),
+  early_voting_starts_at timestamptz not null,
+  early_voting_ends_at timestamptz not null
+);
+
+insert into public.post_voting_settings (singleton, early_voting_starts_at, early_voting_ends_at)
+values (true, now(), now() + interval '14 days')
+on conflict (singleton) do nothing;
+
+alter table public.post_voting_settings enable row level security;
+revoke all on public.post_voting_settings from public, anon, authenticated;
+
 drop policy if exists "Post votes are publicly readable" on public.post_votes;
 create policy "Post votes are publicly readable"
   on public.post_votes for select
@@ -274,6 +287,8 @@ declare
   voter_user_id uuid := auth.uid();
   target_author_id uuid;
   account_created_at timestamptz;
+  early_voting_starts_at timestamptz;
+  early_voting_ends_at timestamptz;
   vote_day_start timestamptz;
   daily_vote_count integer;
   voter_is_moderator boolean;
@@ -323,7 +338,25 @@ begin
   from public.profiles
   where id = voter_user_id;
 
-  if account_created_at is null or account_created_at > now() - interval '14 days' then
+  select settings.early_voting_starts_at, settings.early_voting_ends_at
+  into early_voting_starts_at, early_voting_ends_at
+  from public.post_voting_settings settings
+  where settings.singleton;
+
+  if early_voting_starts_at is null or early_voting_ends_at is null then
+    raise exception 'Voting eligibility settings are not configured.';
+  end if;
+
+  if account_created_at is null or (
+    account_created_at > now() - interval '14 days'
+    and not (
+      (now() >= early_voting_starts_at and now() < early_voting_ends_at)
+      or (
+        account_created_at >= early_voting_starts_at
+        and account_created_at < early_voting_ends_at
+      )
+    )
+  ) then
     raise exception 'Your account must be at least 14 days old to vote.';
   end if;
 
