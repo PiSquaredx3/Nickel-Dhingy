@@ -1440,8 +1440,12 @@ if (!supabaseUrl || !supabaseAnonKey) {
     supabase.auth.onAuthStateChange((event, nextSession) => {
       updateAccount(nextSession?.user || null);
     });
+    const initialRoute = decodeURIComponent(window.location.hash.slice(1));
+    const initialMembersRoute = initialRoute === "members" || initialRoute.startsWith("members/");
+    if (initialMembersRoute) handleRoute();
     await refreshForum();
-    handleRoute();
+    const currentRoute = decodeURIComponent(window.location.hash.slice(1));
+    if (currentRoute !== "members" && !currentRoute.startsWith("members/")) handleRoute();
   } catch (error) {
     console.error("Could not initialize the forum:", error);
     setForumMessage(`Could not connect to the forum: ${error.message}`, true);
