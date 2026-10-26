@@ -192,7 +192,7 @@ async function updateMedalCase(user) {
 async function loadPostAwards(postType, postIds) {
   if (!postIds.length) return new Map();
   const { data, error } = await supabase.from("post_awards")
-    .select("post_type,post_id,author_id,vote_count,voted_by_user,bronze_awarded,silver_awarded,gold_awarded")
+    .select("post_type,post_id,author_id,vote_count,voted_by_user,bronze_awarded,bronze_count,silver_awarded,gold_awarded")
     .eq("post_type", postType)
     .in("post_id", postIds);
   if (error) throw error;
@@ -203,7 +203,7 @@ function appendMemberLabels(container, userId, medals) {
   const labels = makeElement("span", "member-labels");
   let hasLabels = false;
   if (moderatorIds.has(userId)) {
-    labels.append(makeElement("span", "moderator-badge", "Moderator"));
+    labels.append(makeModeratorBadge());
     hasLabels = true;
   }
 
@@ -237,16 +237,31 @@ function makeMedalBadge(name, className) {
   return badge;
 }
 
+function makeModeratorBadge() {
+  const badge = makeElement("span", "moderator-badge");
+  badge.setAttribute("role", "img");
+  badge.setAttribute("aria-label", "Moderator");
+  badge.title = "Moderator";
+  const icon = document.createElement("img");
+  icon.className = "moderator-icon";
+  icon.src = "assets/modstar.png";
+  icon.alt = "";
+  icon.setAttribute("aria-hidden", "true");
+  badge.append(icon);
+  return badge;
+}
+
 function appendPostAwardBadges(container, award) {
   if (!award) return;
   const badges = makeElement("span", "post-award-badges");
-  for (const [name, className, earned] of [
-    ["Bronze", "medal-bronze", award.bronze_awarded],
-    ["Silver", "medal-silver", award.silver_awarded],
-    ["Gold", "medal-gold", award.gold_awarded]
-  ]) {
-    if (earned) badges.append(makeMedalBadge(name, className));
+  const bronzeCount = award.bronze_count || (award.bronze_awarded ? 1 : 0);
+  for (let index = 0; index < bronzeCount; index += 1) {
+    const badge = makeMedalBadge("Bronze", "medal-bronze");
+    badge.title = `${bronzeCount} Bronze medal${bronzeCount === 1 ? "" : "s"} earned on this post`;
+    badges.append(badge);
   }
+  if (award.silver_awarded) badges.append(makeMedalBadge("Silver", "medal-silver"));
+  if (award.gold_awarded) badges.append(makeMedalBadge("Gold", "medal-gold"));
   if (badges.childElementCount) container.append(badges);
 }
 
@@ -269,7 +284,9 @@ function updateAccount(user) {
     const avatar = makeElement("span", "account-avatar", username.slice(0, 1).toUpperCase());
     profileButton.append(avatar, makeElement("span", "", username));
     if (moderatorIds.has(user.id)) {
-      profileButton.append(makeElement("span", "moderator-badge account-moderator-badge", "Moderator"));
+      const moderatorBadge = makeModeratorBadge();
+      moderatorBadge.classList.add("account-moderator-badge");
+      profileButton.append(moderatorBadge);
     }
     links.append(profileButton);
     links.append(makeButton("Log out", "logout", "text-button"));
@@ -743,7 +760,13 @@ function makePostForm(heading, submitLabel, onSubmit, leadingFields = [], includ
   form.append(label);
   const emojiPicker = document.createElement("details");
   emojiPicker.className = "emoji-picker";
-  emojiPicker.append(makeElement("summary", "", "Insert an emoji"));
+  const emojiToggle = makeElement("summary", "emoji-picker-toggle");
+  const emojiToggleIcon = document.createElement("img");
+  emojiToggleIcon.src = "assets/emojis/smile.gif";
+  emojiToggleIcon.alt = "";
+  emojiToggleIcon.setAttribute("aria-hidden", "true");
+  emojiToggle.append(emojiToggleIcon, makeElement("span", "", "Choose an emoji"));
+  emojiPicker.append(emojiToggle);
   const emojiGrid = makeElement("div", "emoji-grid");
   for (const name of emojiNames) {
     const button = document.createElement("button");

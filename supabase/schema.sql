@@ -317,7 +317,15 @@ select
   coalesce(v.voted_by_user, false) as voted_by_user,
   (coalesce(v.vote_count, 0) >= 10 or coalesce(v.moderator_awarded, false)) as bronze_awarded,
   coalesce(v.moderator_awarded, false) as silver_awarded,
-  coalesce(v.pi_awarded, false) as gold_awarded
+  coalesce(v.pi_awarded, false) as gold_awarded,
+  greatest(
+    case
+      when coalesce(v.vote_count, 0) >= 10
+        then 1 + ((coalesce(v.vote_count, 0) - 10) / 20)
+      else 0
+    end,
+    case when coalesce(v.moderator_awarded, false) then 1 else 0 end
+  )::integer as bronze_count
 from posts p
 left join vote_summary v using (post_type, post_id);
 
@@ -326,7 +334,7 @@ with (security_invoker = true)
 as
 select
   author_id as user_id,
-  count(*) filter (where bronze_awarded)::integer as bronze_count,
+  coalesce(sum(bronze_count), 0)::integer as bronze_count,
   count(*) filter (where silver_awarded)::integer as silver_count,
   count(*) filter (where gold_awarded)::integer as gold_count
 from public.post_awards

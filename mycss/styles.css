@@ -869,9 +869,19 @@ button:active {
 }
 
 .moderator-badge {
-  border-color: #5595a9;
-  background: #193b49;
-  color: #9de3f5;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  line-height: 0;
+}
+
+.moderator-icon {
+  display: block;
+  width: 16px;
+  height: 16px;
 }
 
 .account-moderator-badge {
@@ -1041,15 +1051,69 @@ button:active {
 }
 
 .emoji-picker {
+  width: fit-content;
+}
+
+.emoji-picker-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border: 1px solid #5e9fb2;
+  background: linear-gradient(#294b60, #1d374a);
+  color: #d3f3ff;
+  font-size: 11px;
+  font-weight: bold;
+  list-style: none;
+  cursor: pointer;
+}
+
+.emoji-picker-toggle::-webkit-details-marker {
+  display: none;
+}
+
+.emoji-picker-toggle::after {
+  content: "+";
+  margin-left: 3px;
+  color: #9fcfe2;
+}
+
+.emoji-picker[open] .emoji-picker-toggle::after {
+  content: "−";
+}
+
+.emoji-picker-toggle:hover,
+.emoji-picker-toggle:focus-visible {
+  border-color: #9de3f5;
+  background: linear-gradient(#365e75, #26475c);
+  outline: 1px solid #82cde7;
+}
+
+.emoji-picker-toggle img {
+  width: auto;
+  height: auto;
+  max-width: 20px;
+  max-height: 20px;
+}
+
+.emoji-picker[open] {
   border: 1px solid #3c4c62;
   background: #172233;
 }
 
-.emoji-picker summary {
-  padding: 7px 9px;
+.emoji-picker[open] .emoji-picker-toggle {
+  border: 0;
+  background: transparent;
   color: #9fcfe2;
-  font-size: 11px;
-  cursor: pointer;
+}
+
+.emoji-picker[open] .emoji-picker-toggle:hover,
+.emoji-picker[open] .emoji-picker-toggle:focus-visible {
+  background: #22344a;
+}
+
+.emoji-picker[open] .emoji-grid {
+  border-top: 1px solid #3c4c62;
 }
 
 .emoji-grid {
@@ -1059,7 +1123,15 @@ button:active {
   max-height: 220px;
   overflow: auto;
   padding: 7px;
-  border-top: 1px solid #3c4c62;
+}
+
+.emoji-picker-toggle:focus-visible {
+  outline-offset: 1px;
+}
+
+.emoji-picker-toggle span {
+  color: inherit;
+  font-size: 11px;
 }
 
 .emoji-choice {
