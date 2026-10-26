@@ -234,7 +234,6 @@ function appendMemberLabels(container, userId, medals) {
   ]) {
     if (!count) continue;
     const badge = makeMedalBadge(name, className);
-    badge.append(makeElement("span", "medal-count", `×${count}`));
     badge.title = `${count} ${name} medal${count === 1 ? "" : "s"} earned`;
     labels.append(badge);
     hasLabels = true;

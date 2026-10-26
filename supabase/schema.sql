@@ -283,6 +283,43 @@ on conflict (singleton) do nothing;
 alter table public.post_voting_settings enable row level security;
 revoke all on public.post_voting_settings from public, anon, authenticated;
 
+create table if not exists public.post_medal_settings (
+  singleton boolean primary key default true check (singleton),
+  reset_at timestamptz not null default now(),
+  reset_generation integer not null default 1
+);
+
+alter table public.post_medal_settings
+  add column if not exists reset_generation integer not null default 1;
+
+delete from public.post_votes
+where not exists (
+  select 1 from public.post_medal_settings where singleton
+);
+
+insert into public.post_medal_settings (singleton, reset_at)
+values (true, now())
+on conflict (singleton) do nothing;
+
+delete from public.post_votes
+where exists (
+  select 1
+  from public.post_medal_settings
+  where singleton and reset_generation < 2
+);
+
+update public.post_medal_settings
+set reset_at = now(), reset_generation = 2
+where singleton and reset_generation < 2;
+
+alter table public.post_medal_settings enable row level security;
+revoke all on public.post_medal_settings from public, anon, authenticated;
+drop policy if exists "Medal reset time is publicly readable" on public.post_medal_settings;
+create policy "Medal reset time is publicly readable"
+  on public.post_medal_settings for select
+  using (true);
+grant select on public.post_medal_settings to anon, authenticated;
+
 drop policy if exists "Post votes are publicly readable" on public.post_votes;
 create policy "Post votes are publicly readable"
   on public.post_votes for select
@@ -303,11 +340,19 @@ vote_summary as (
     case when topic_id is not null then 'topic' else 'reply' end::text as post_type,
     coalesce(topic_id, reply_id) as post_id,
     count(*)::integer as vote_count,
-    sum(case when is_pi then 100 when is_moderator then 10 else 1 end)::integer as weighted_vote_count,
-    coalesce(bool_or(voter_id = (select auth.uid())), false) as voted_by_user,
-    coalesce(bool_or(is_moderator), false) as moderator_awarded,
+    coalesce(bool_or(voter_id = (select auth.uid())), false) as voted_by_user
+  from public.post_votes
+  group by 1, 2
+),
+medal_vote_summary as (
+  select
+    case when topic_id is not null then 'topic' else 'reply' end::text as post_type,
+    coalesce(topic_id, reply_id) as post_id,
+    sum(case when is_pi then 0 when is_moderator then 10 else 1 end)::integer as weighted_vote_count,
+    coalesce(bool_or(is_moderator and not is_pi), false) as moderator_awarded,
     coalesce(bool_or(is_pi), false) as pi_awarded
   from public.post_votes
+  where created_at >= (select reset_at from public.post_medal_settings where singleton)
   group by 1, 2
 )
 select
@@ -316,30 +361,47 @@ select
   p.author_id,
   coalesce(v.vote_count, 0)::integer as vote_count,
   coalesce(v.voted_by_user, false) as voted_by_user,
-  (coalesce(v.weighted_vote_count, 0) >= 10) as bronze_awarded,
-  coalesce(v.moderator_awarded, false) as silver_awarded,
-  coalesce(v.pi_awarded, false) as gold_awarded,
+  (coalesce(m.weighted_vote_count, 0) >= 10) as bronze_awarded,
+  coalesce(m.moderator_awarded, false) as silver_awarded,
+  coalesce(m.pi_awarded, false) as gold_awarded,
   greatest(
     case
-      when coalesce(v.weighted_vote_count, 0) >= 10
-        then coalesce(v.weighted_vote_count, 0) / 10
+      when coalesce(m.weighted_vote_count, 0) >= 10
+        then coalesce(m.weighted_vote_count, 0) / 10
       else 0
     end,
-    case when coalesce(v.moderator_awarded, false) then 1 else 0 end
+    case when coalesce(m.moderator_awarded, false) then 1 else 0 end
   )::integer as bronze_count
 from posts p
-left join vote_summary v using (post_type, post_id);
+left join vote_summary v using (post_type, post_id)
+left join medal_vote_summary m using (post_type, post_id);
 
 create or replace view public.member_medals
 with (security_invoker = true)
 as
+with earned_medals as (
+  select
+    author_id as user_id,
+    coalesce(sum(bronze_count), 0)::bigint as bronze_earned,
+    count(*) filter (where silver_awarded)::bigint as silver_earned,
+    count(*) filter (where gold_awarded)::bigint as gold_earned
+  from public.post_awards
+  group by author_id
+),
+silver_conversions as (
+  select
+    user_id,
+    bronze_earned % 10 as bronze_count,
+    silver_earned + bronze_earned / 10 as silver_total,
+    gold_earned
+  from earned_medals
+)
 select
-  author_id as user_id,
-  coalesce(sum(bronze_count), 0)::integer as bronze_count,
-  count(*) filter (where silver_awarded)::integer as silver_count,
-  count(*) filter (where gold_awarded)::integer as gold_count
-from public.post_awards
-group by author_id;
+  user_id,
+  bronze_count::integer as bronze_count,
+  (silver_total % 10)::integer as silver_count,
+  (gold_earned + silver_total / 10)::integer as gold_count
+from silver_conversions;
 
 create or replace function public.cast_post_vote(p_topic_id uuid default null, p_reply_id uuid default null)
 returns void

@@ -841,12 +841,6 @@ button:active {
   object-fit: contain;
 }
 
-.medal-count {
-  color: #d9e0e9;
-  font-size: 9px;
-  line-height: 1;
-}
-
 .medal-bronze {
   border-color: #9c7048;
   background: #453326;
