@@ -235,7 +235,7 @@ function appendMemberLabels(container, userId, medals) {
     if (!count) continue;
     const badge = makeMedalBadge(name, className);
     badge.append(makeElement("span", "medal-count", `×${count}`));
-    badge.title = `${count} post${count === 1 ? "" : "s"} earned this medal`;
+    badge.title = `${count} ${name} medal${count === 1 ? "" : "s"} earned`;
     labels.append(badge);
     hasLabels = true;
   }
@@ -271,18 +271,29 @@ function makeModeratorBadge() {
   return badge;
 }
 
-function appendPostAwardBadges(container, award) {
-  if (!award) return;
-  const badges = makeElement("span", "post-award-badges");
-  const bronzeCount = award.bronze_count || (award.bronze_awarded ? 1 : 0);
-  for (let index = 0; index < bronzeCount; index += 1) {
-    const badge = makeMedalBadge("Bronze", "medal-bronze");
-    badge.title = `${bronzeCount} Bronze medal${bronzeCount === 1 ? "" : "s"} earned on this post`;
-    badges.append(badge);
+function appendMemberMedalStars(container, medals) {
+  const tiers = [
+    ["Bronze", "medal-bronze", medals?.bronze_count || 0],
+    ["Silver", "medal-silver", medals?.silver_count || 0],
+    ["Gold", "medal-gold", medals?.gold_count || 0]
+  ];
+  const totalCount = tiers.reduce((total, [, , count]) => total + count, 0);
+  if (!totalCount) return;
+
+  const stars = makeElement("span", "post-author-medals");
+  const description = [];
+  for (const [name, className, count] of tiers) {
+    if (!count) continue;
+    description.push(`${count} ${name}`);
+    for (let index = 0; index < count; index += 1) {
+      const badge = makeMedalBadge(name, className);
+      stars.append(badge);
+    }
   }
-  if (award.silver_awarded) badges.append(makeMedalBadge("Silver", "medal-silver"));
-  if (award.gold_awarded) badges.append(makeMedalBadge("Gold", "medal-gold"));
-  if (badges.childElementCount) container.append(badges);
+  stars.setAttribute("role", "img");
+  stars.setAttribute("aria-label", `Member medals: ${description.join(", ")}`);
+  stars.title = `Member medals: ${description.join(", ")}`;
+  container.append(stars);
 }
 
 function setStat(name, value) {
@@ -444,8 +455,6 @@ async function loadLatestDiscussions() {
     .order("updated_at", { ascending: false })
     .limit(5);
   if (error) throw error;
-  const authorIds = data.map(topic => topic.profiles?.id);
-  const medalsByUser = await loadMemberMedals(authorIds);
 
   const list = document.querySelector("#latest-discussions");
   list.replaceChildren();
@@ -462,7 +471,7 @@ async function loadLatestDiscussions() {
       link,
       makeElement("span", "latest-topic-meta", `${topic.boards?.title || "Forum"} · ${topic.profiles?.username || "member"}`)
     );
-    appendMemberLabels(item, topic.profiles?.id, medalsByUser.get(topic.profiles?.id));
+    appendMemberLabels(item, topic.profiles?.id, null);
     list.append(item);
   }
 }
@@ -701,8 +710,9 @@ function renderPost(profile, date, body, className, imageUrl = null, activity = 
     image.addEventListener("error", () => image.remove(), { once: true });
     avatar.append(image);
   }
+  appendMemberMedalStars(authorPanel, medals);
   authorPanel.append(avatar, makeElement("strong", "post-author-name", author));
-  appendMemberLabels(authorPanel, profile?.id, medals);
+  appendMemberLabels(authorPanel, profile?.id, null);
 
   const profileLink = safeHttpsUrl(profile?.profile_link);
   if (profileLink) {
@@ -719,7 +729,6 @@ function renderPost(profile, date, body, className, imageUrl = null, activity = 
   const content = makeElement("div", "post-content");
   const header = makeElement("div", "post-header");
   header.append(makeElement("time", "", formatDate(date)));
-  appendPostAwardBadges(header, award);
   if (award && postType && postId) {
     const voteButton = makeButton(
       award.voted_by_user ? `Voted · ${award.vote_count}` : `Vote · ${award.vote_count}`,

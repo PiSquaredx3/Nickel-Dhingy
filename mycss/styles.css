@@ -1015,6 +1015,23 @@ button:active {
   font-weight: bold;
 }
 
+.post-author-medals {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  align-self: stretch;
+  justify-content: flex-start;
+  gap: 3px;
+  padding: 2px;
+  border-radius: 2px;
+  background: rgba(17, 27, 41, 0.78);
+}
+
+.post-author-medals .medal-inline-icon {
+  width: 16px;
+  height: 16px;
+}
+
 .post-avatar img {
   position: absolute;
   inset: 0;

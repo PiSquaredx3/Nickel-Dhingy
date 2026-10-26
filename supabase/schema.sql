@@ -303,6 +303,7 @@ vote_summary as (
     case when topic_id is not null then 'topic' else 'reply' end::text as post_type,
     coalesce(topic_id, reply_id) as post_id,
     count(*)::integer as vote_count,
+    sum(case when is_pi then 100 when is_moderator then 10 else 1 end)::integer as weighted_vote_count,
     coalesce(bool_or(voter_id = (select auth.uid())), false) as voted_by_user,
     coalesce(bool_or(is_moderator), false) as moderator_awarded,
     coalesce(bool_or(is_pi), false) as pi_awarded
@@ -315,13 +316,13 @@ select
   p.author_id,
   coalesce(v.vote_count, 0)::integer as vote_count,
   coalesce(v.voted_by_user, false) as voted_by_user,
-  (coalesce(v.vote_count, 0) >= 10 or coalesce(v.moderator_awarded, false)) as bronze_awarded,
+  (coalesce(v.weighted_vote_count, 0) >= 10) as bronze_awarded,
   coalesce(v.moderator_awarded, false) as silver_awarded,
   coalesce(v.pi_awarded, false) as gold_awarded,
   greatest(
     case
-      when coalesce(v.vote_count, 0) >= 10
-        then 1 + ((coalesce(v.vote_count, 0) - 10) / 20)
+      when coalesce(v.weighted_vote_count, 0) >= 10
+        then coalesce(v.weighted_vote_count, 0) / 10
       else 0
     end,
     case when coalesce(v.moderator_awarded, false) then 1 else 0 end
