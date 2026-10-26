@@ -620,6 +620,18 @@ button:active {
   font-size: 10px;
 }
 
+.forum-news-editor:not([hidden]) {
+  display: grid;
+  gap: 9px;
+  margin-top: 10px;
+}
+
+.forum-news-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .panel-link {
   display: inline-block;
   margin-top: 11px;

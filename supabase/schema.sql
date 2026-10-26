@@ -97,6 +97,43 @@ alter table public.boards
   drop column if exists icon,
   add column if not exists description text not null default '';
 
+create table if not exists public.forum_news (
+  singleton boolean primary key default true check (singleton),
+  headline text not null check (char_length(btrim(headline)) between 1 and 80),
+  body text not null check (char_length(btrim(body)) between 1 and 1000)
+);
+
+insert into public.forum_news (singleton, headline, body)
+values (true, 'hi.', 'I made this place out of bordem of a 12 hour saturday shift. Go Nuts.')
+on conflict (singleton) do nothing;
+
+alter table public.forum_news enable row level security;
+revoke all on public.forum_news from public, anon, authenticated;
+
+drop policy if exists "Forum news is publicly readable" on public.forum_news;
+create policy "Forum news is publicly readable"
+  on public.forum_news for select
+  using (true);
+
+drop policy if exists "Moderators can update forum news" on public.forum_news;
+create policy "Moderators can update forum news"
+  on public.forum_news for update to authenticated
+  using (
+    exists (
+      select 1 from public.moderators
+      where user_id = (select auth.uid())
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.moderators
+      where user_id = (select auth.uid())
+    )
+  );
+
+grant select on public.forum_news to anon, authenticated;
+grant update on public.forum_news to authenticated;
+
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
   'profile-avatars',

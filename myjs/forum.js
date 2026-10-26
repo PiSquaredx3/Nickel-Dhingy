@@ -24,6 +24,12 @@ const authSwitch = document.querySelector("#auth-switch");
 const siteTitle = document.querySelector(".site-title");
 const ratingBadgeStatus = document.querySelector("#rating-badge-status");
 const ratingBadgeDisplay = document.querySelector("#rating-badge-display");
+const forumNewsHeadline = document.querySelector("#forum-news-headline");
+const forumNewsBody = document.querySelector("#forum-news-body");
+const forumNewsMessage = document.querySelector("#forum-news-message");
+const forumNewsEditButton = document.querySelector("#forum-news-edit");
+const forumNewsEditor = document.querySelector("#forum-news-editor");
+const forumNewsForm = forumNewsEditor;
 const authMode = { value: "signup" };
 const legacyBoardSlugs = {
   "dos-windows": "general",
@@ -146,6 +152,20 @@ async function loadModerators() {
   const { data, error } = await supabase.from("moderators").select("user_id");
   if (error) throw error;
   moderatorIds = new Set(data.map(moderator => moderator.user_id));
+}
+
+function renderForumNews(news) {
+  forumNewsHeadline.textContent = news.headline;
+  forumNewsBody.textContent = news.body;
+}
+
+async function loadForumNews() {
+  const { data, error } = await supabase.from("forum_news")
+    .select("headline,body")
+    .eq("singleton", true)
+    .single();
+  if (error) throw error;
+  renderForumNews(data);
 }
 
 async function loadMemberActivity(userIds) {
@@ -296,6 +316,8 @@ function setStat(name, value) {
 function updateAccount(user) {
   const previousUserId = currentUser?.id;
   currentUser = user;
+  forumNewsEditButton.hidden = !user || !moderatorIds.has(user.id);
+  if (forumNewsEditButton.hidden) forumNewsEditor.hidden = true;
   if (previousUserId !== user?.id) notificationsRequest++;
   void updateRatingBadge(user);
   const links = document.querySelector("#account-links");
@@ -1692,7 +1714,16 @@ document.addEventListener("click", event => {
   const actionButton = event.target.closest("[data-action]");
   if (!actionButton) return;
   const action = actionButton.dataset.action;
-  if (action === "notifications") {
+  if (action === "edit-forum-news") {
+    if (!currentUser || !moderatorIds.has(currentUser.id)) return;
+    forumNewsForm.elements.headline.value = forumNewsHeadline.textContent;
+    forumNewsForm.elements.body.value = forumNewsBody.textContent;
+    forumNewsMessage.textContent = "";
+    forumNewsEditor.hidden = false;
+    forumNewsForm.elements.headline.focus();
+  } else if (action === "cancel-forum-news") {
+    forumNewsEditor.hidden = true;
+  } else if (action === "notifications") {
     window.location.hash = "notifications";
   } else if (action.startsWith("mark-notification:")) {
     void markNotificationRead(action.slice("mark-notification:".length));
@@ -1734,6 +1765,38 @@ document.querySelectorAll("[data-close-dialog]").forEach(button => {
 });
 
 document.querySelector("[data-close-profile]").addEventListener("click", () => profileDialog.close());
+
+forumNewsForm.addEventListener("submit", async event => {
+  event.preventDefault();
+  if (!currentUser || !moderatorIds.has(currentUser.id)) {
+    forumNewsEditor.hidden = true;
+    return;
+  }
+
+  const saveButton = forumNewsForm.querySelector('button[type="submit"]');
+  saveButton.disabled = true;
+  forumNewsMessage.classList.remove("error-message");
+  forumNewsMessage.textContent = "Saving news…";
+  try {
+    const headline = forumNewsForm.elements.headline.value.trim();
+    const body = forumNewsForm.elements.body.value.trim();
+    const { data, error } = await supabase.from("forum_news")
+      .update({ headline, body })
+      .eq("singleton", true)
+      .select("headline,body")
+      .single();
+    if (error) throw error;
+    renderForumNews(data);
+    forumNewsEditor.hidden = true;
+    forumNewsMessage.textContent = "News updated.";
+  } catch (error) {
+    console.error("Could not update forum news:", error);
+    forumNewsMessage.textContent = `Could not update forum news: ${error.message}`;
+    forumNewsMessage.classList.add("error-message");
+  } finally {
+    saveButton.disabled = false;
+  }
+});
 
 authForgot.addEventListener("click", () => {
   openAuth("reset-request");
@@ -1829,6 +1892,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
       }
     });
     await loadModerators();
+    try {
+      await loadForumNews();
+    } catch (error) {
+      console.error("Could not load forum news:", error);
+      forumNewsMessage.textContent = `Could not load forum news: ${error.message}`;
+      forumNewsMessage.classList.add("error-message");
+    }
     const { data: { session } } = await supabase.auth.getSession();
     updateAccount(session?.user || null);
     supabase.auth.onAuthStateChange((event, nextSession) => {

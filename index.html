@@ -54,10 +54,26 @@
             <div class="bulletin">
               <span class="bulletin-date" aria-hidden="true">NEWS</span>
               <div>
-                <strong>hi.</strong>
-                <p>I made this place out of bordem of a 12 hour saturday shift. Go Nuts.</p>
+                <strong id="forum-news-headline">hi.</strong>
+                <p id="forum-news-body">I made this place out of bordem of a 12 hour saturday shift. Go Nuts.</p>
               </div>
             </div>
+            <p id="forum-news-message" class="form-message" role="status"></p>
+            <button id="forum-news-edit" type="button" class="small-button" data-action="edit-forum-news" hidden>Edit news</button>
+            <form id="forum-news-editor" class="forum-news-editor" hidden>
+              <label class="form-field">
+                Headline
+                <input name="headline" type="text" maxlength="80" required />
+              </label>
+              <label class="form-field">
+                News
+                <textarea name="body" rows="4" maxlength="1000" required></textarea>
+              </label>
+              <div class="forum-news-actions">
+                <button type="submit" class="small-button">Save news</button>
+                <button type="button" class="text-button" data-action="cancel-forum-news">Cancel</button>
+              </div>
+            </form>
           </section>
 
           <section class="side-panel" aria-labelledby="daily-question-title">
