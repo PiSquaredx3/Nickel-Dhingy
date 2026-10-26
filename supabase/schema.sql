@@ -29,6 +29,43 @@ alter table public.profiles
 create unique index if not exists profiles_username_case_insensitive
   on public.profiles (lower(username));
 
+create or replace function public.is_reserved_username(requested_username text)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select lower(btrim(coalesce(requested_username, ''))) ~
+    'admin|moderator|(^|[_0-9])(mod|mods|staff|support|owner|owners)([_0-9]|$)'
+    or lower(btrim(coalesce(requested_username, ''))) ~ '(^|[_0-9])pi([_0-9]|$)'
+    or lower(btrim(coalesce(requested_username, ''))) in (
+      'pisquaredx3', 'nickel', 'nickeldhingy', 'nickel_dhingy'
+    );
+$$;
+
+create or replace function public.prevent_reserved_username()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if public.is_reserved_username(new.username) then
+    raise exception 'That forum name is reserved for staff or the site owner.';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists enforce_reserved_profile_username_insert on public.profiles;
+create trigger enforce_reserved_profile_username_insert
+  before insert on public.profiles
+  for each row execute procedure public.prevent_reserved_username();
+
+drop trigger if exists enforce_reserved_profile_username_update on public.profiles;
+create trigger enforce_reserved_profile_username_update
+  before update of username on public.profiles
+  for each row execute procedure public.prevent_reserved_username();
+
 create table if not exists public.moderators (
   user_id uuid primary key references public.profiles (id) on delete cascade,
   created_at timestamptz not null default now()
@@ -600,6 +637,9 @@ begin
 
   if requested_username is null or requested_username !~ '^[A-Za-z0-9_]{3,24}$' then
     requested_username := 'member_' || left(new.id::text, 8);
+  end if;
+  if public.is_reserved_username(requested_username) then
+    raise exception 'That forum name is reserved for staff or the site owner.';
   end if;
 
   insert into public.profiles (id, username)

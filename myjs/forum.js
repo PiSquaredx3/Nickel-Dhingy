@@ -46,6 +46,7 @@ let boards = [];
 let moderatorIds = new Set();
 let medalCaseRequest = 0;
 let membersRequest = 0;
+let boardTopicsRequest = 0;
 const membersPerPage = 25;
 
 const siteTitles = [
@@ -126,6 +127,13 @@ function formatDate(value) {
 
 function formatDateOnly(value) {
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(value));
+}
+
+function isReservedUsername(username) {
+  const normalized = username.trim().toLowerCase();
+  return /admin|moderator|(^|[_0-9])(mod|mods|staff|support|owner|owners)([_0-9]|$)/.test(normalized)
+    || /(^|[_0-9])pi([_0-9]|$)/.test(normalized)
+    || ["pisquaredx3", "nickel", "nickeldhingy", "nickel_dhingy"].includes(normalized);
 }
 
 async function loadModerators() {
@@ -261,12 +269,7 @@ function makeModeratorBadge() {
   badge.setAttribute("role", "img");
   badge.setAttribute("aria-label", "Moderator");
   badge.title = "Moderator";
-  const icon = document.createElement("img");
-  icon.className = "moderator-icon";
-  icon.src = "assets/modstar.png";
-  icon.alt = "";
-  icon.setAttribute("aria-hidden", "true");
-  badge.append(icon);
+  badge.append(makeElement("span", "moderator-badge-text", "MOD"));
   return badge;
 }
 
@@ -573,6 +576,7 @@ async function showMembers(pageNumber = 1) {
 
 async function showBoard(slug) {
   membersView.hidden = true;
+  boardTopicsRequest++;
   const board = boards.find(item => item.slug === slug);
   if (!board) {
     setForumMessage("That board could not be found.", true);
@@ -589,23 +593,62 @@ async function showBoard(slug) {
     makeButton("Start a topic", `compose:${board.slug}`, "primary-button"),
     "comment-add"
   ));
+  const sortControl = makeElement("label", "topic-sort-control");
+  sortControl.append(document.createTextNode("Sort posts "));
+  const sortSelect = makeElement("select", "topic-sort-select");
+  sortSelect.setAttribute("aria-label", "Sort posts");
+  for (const [value, label] of [
+    ["recent", "Recent activity"],
+    ["day", "Active in the last 24 hours"],
+    ["week", "Active in the last 7 days"]
+  ]) {
+    const option = makeElement("option", "", label);
+    option.value = value;
+    sortSelect.append(option);
+  }
+  sortControl.append(sortSelect);
+  boardView.append(sortControl);
   const list = makeElement("div", "topic-list");
   list.append(makeElement("p", "empty-state", "Loading topics…"));
   boardView.append(list);
 
+  sortSelect.addEventListener("change", () => {
+    loadBoardTopics(board, list, sortSelect.value);
+  });
+  await loadBoardTopics(board, list, sortSelect.value);
+}
+
+async function loadBoardTopics(board, list, sort) {
+  const request = ++boardTopicsRequest;
+  list.replaceChildren(makeElement("p", "empty-state", "Loading topics…"));
   try {
-    const { data, error } = await supabase.from("topics")
+    let query = supabase.from("topics")
       .select("id,title,body,image_url,is_pinned,created_at,updated_at,profiles!topics_author_id_fkey(id,username),replies(count)")
-      .eq("board_id", board.id)
+      .eq("board_id", board.id);
+    if (sort === "day" || sort === "week") {
+      const days = sort === "day" ? 1 : 7;
+      query = query.gte("updated_at", new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString());
+    }
+    const { data, error } = await query
       .order("is_pinned", { ascending: false })
       .order("updated_at", { ascending: false })
       .range(0, 49);
     if (error) throw error;
+    if (request !== boardTopicsRequest) return;
+    const awardsByPost = await loadPostAwards("topic", data.map(topic => topic.id));
+    if (request !== boardTopicsRequest) return;
     const authorIds = data.map(topic => topic.profiles?.id);
     const medalsByUser = await loadMemberMedals(authorIds);
+    if (request !== boardTopicsRequest) return;
     list.replaceChildren();
     if (!data.length) {
-      list.append(makeElement("p", "empty-state", "No topics here yet. Start the first conversation."));
+      list.append(makeElement(
+        "p",
+        "empty-state",
+        sort === "day" || sort === "week"
+          ? "No topics were active during this period."
+          : "No topics here yet. Start the first conversation."
+      ));
       return;
     }
     for (const topic of data) {
@@ -633,6 +676,10 @@ async function showBoard(slug) {
         details.append(pinnedLabel);
       }
       details.append(title);
+      const voteCount = awardsByPost.get(`topic:${topic.id}`)?.vote_count || 0;
+      const rating = makeElement("span", "topic-vote-rating", `${voteCount} ${voteCount === 1 ? "vote" : "votes"}`);
+      rating.setAttribute("aria-label", `Rating: ${voteCount} ${voteCount === 1 ? "vote" : "votes"}`);
+      details.append(rating);
       const replyCount = topic.replies?.[0]?.count || 0;
       details.append(
         makeElement("p", "topic-meta", `${topic.profiles?.username || "member"} · ${formatDate(topic.updated_at)} · ${replyCount} replies`),
@@ -652,6 +699,7 @@ async function showBoard(slug) {
       list.append(item);
     }
   } catch (error) {
+    if (request !== boardTopicsRequest) return;
     console.error("Could not load board topics:", error);
     list.replaceChildren(makeElement("p", "form-message error-message", `Could not load topics: ${error.message}`));
   }
@@ -1391,6 +1439,9 @@ authForm.addEventListener("submit", async event => {
       setForumMessage("Your password has been reset. You are now logged in.");
     } else if (authMode.value === "signup") {
       const username = authForm.elements.username.value.trim().toLowerCase();
+      if (isReservedUsername(username)) {
+        throw new Error("That forum name is reserved for staff or the site owner. Please choose another.");
+      }
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
