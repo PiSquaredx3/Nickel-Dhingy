@@ -694,6 +694,24 @@ button:active {
   font-weight: bold;
 }
 
+.topic-pinned-badge {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 5px;
+  border: 1px solid #b18b45;
+  background: #4a3c25;
+  color: #f4d17b;
+  font-size: 9px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.moderation-pin {
+  margin-top: 5px;
+  padding: 3px 7px;
+  font-size: 10px;
+}
+
 .topic-list-image-link {
   display: block;
   flex: 0 0 88px;

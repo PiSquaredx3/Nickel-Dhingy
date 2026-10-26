@@ -443,8 +443,9 @@ async function showBoard(slug) {
 
   try {
     const { data, error } = await supabase.from("topics")
-      .select("id,title,body,image_url,created_at,updated_at,profiles!topics_author_id_fkey(id,username),replies(count)")
+      .select("id,title,body,image_url,is_pinned,created_at,updated_at,profiles!topics_author_id_fkey(id,username),replies(count)")
       .eq("board_id", board.id)
+      .order("is_pinned", { ascending: false })
       .order("updated_at", { ascending: false })
       .range(0, 49);
     if (error) throw error;
@@ -474,12 +475,26 @@ async function showBoard(slug) {
       const details = makeElement("div", "topic-list-details");
       const title = makeElement("a", "topic-list-title", topic.title);
       title.href = `#topic/${topic.id}`;
+      if (topic.is_pinned) {
+        const pinnedLabel = makeElement("span", "topic-pinned-badge", "Pinned");
+        pinnedLabel.setAttribute("aria-label", "Pinned topic");
+        details.append(pinnedLabel);
+      }
+      details.append(title);
       const replyCount = topic.replies?.[0]?.count || 0;
       details.append(
-        title,
         makeElement("p", "topic-meta", `${topic.profiles?.username || "member"} · ${formatDate(topic.updated_at)} · ${replyCount} replies`),
         makeElement("p", "topic-preview", topic.body)
       );
+      if (moderatorIds.has(currentUser?.id)) {
+        const pinButton = makeButton(
+          topic.is_pinned ? "Unpin" : "Pin",
+          `moderate-pin-topic:${topic.id}:${topic.is_pinned ? "false" : "true"}`,
+          "small-button moderation-pin"
+        );
+        pinButton.title = topic.is_pinned ? "Unpin this topic" : "Pin this topic to the top of the board";
+        details.append(pinButton);
+      }
       appendMemberLabels(details, topic.profiles?.id, medalsByUser.get(topic.profiles?.id));
       item.append(details);
       list.append(item);
@@ -985,6 +1000,16 @@ async function runModerationAction(action) {
       await moderateDeleteTopic(action.slice("moderate-delete-topic:".length));
     } else if (action.startsWith("moderate-delete-reply:")) {
       await moderateDeleteReply(action.slice("moderate-delete-reply:".length));
+    } else if (action.startsWith("moderate-pin-topic:")) {
+      if (!moderatorIds.has(currentUser?.id)) throw new Error("Moderator access is required.");
+      const [, topicId, pinnedValue] = action.split(":");
+      const { error } = await supabase.rpc("set_topic_pinned", {
+        p_topic_id: topicId,
+        p_is_pinned: pinnedValue === "true"
+      });
+      if (error) throw error;
+      const route = decodeURIComponent(window.location.hash.slice(1));
+      if (route.startsWith("board/")) await showBoard(route.slice("board/".length));
     }
   } catch (error) {
     console.error("Could not complete moderation action:", error);
@@ -1037,7 +1062,7 @@ document.addEventListener("click", event => {
     } else {
       openAuth("signup");
     }
-  } else if (action.startsWith("moderate-delete-")) {
+  } else if (action.startsWith("moderate-delete-") || action.startsWith("moderate-pin-topic:")) {
     void runModerationAction(action);
   } else if (action.startsWith("vote:")) {
     void runVoteAction(action);

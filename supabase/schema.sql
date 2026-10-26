@@ -153,6 +153,7 @@ create table if not exists public.topics (
   title text not null,
   body text not null,
   image_url text,
+  is_pinned boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint topics_title_length check (char_length(btrim(title)) between 1 and 120),
@@ -160,7 +161,8 @@ create table if not exists public.topics (
 );
 
 alter table public.topics
-  add column if not exists image_url text;
+  add column if not exists image_url text,
+  add column if not exists is_pinned boolean not null default false;
 
 create table if not exists public.replies (
   id uuid primary key default gen_random_uuid(),
@@ -172,9 +174,62 @@ create table if not exists public.replies (
 );
 
 create index if not exists topics_board_updated_at on public.topics (board_id, updated_at desc);
+create index if not exists topics_board_pinned_updated_at
+  on public.topics (board_id, is_pinned desc, updated_at desc);
 create index if not exists topics_author_id on public.topics (author_id);
 create index if not exists replies_topic_created_at on public.replies (topic_id, created_at);
 create index if not exists replies_author_id on public.replies (author_id);
+
+create or replace function public.prevent_non_moderator_topic_pin_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.is_pinned is distinct from old.is_pinned
+    and not exists (
+      select 1 from public.moderators
+      where user_id = (select auth.uid())
+    )
+  then
+    raise exception 'Only moderators can pin or unpin topics.';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists enforce_moderator_topic_pinning on public.topics;
+create trigger enforce_moderator_topic_pinning
+  before update of is_pinned on public.topics
+  for each row execute procedure public.prevent_non_moderator_topic_pin_change();
+
+create or replace function public.set_topic_pinned(p_topic_id uuid, p_is_pinned boolean)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not exists (
+    select 1 from public.moderators
+    where user_id = (select auth.uid())
+  ) then
+    raise exception 'Moderator access is required to pin or unpin topics.';
+  end if;
+
+  update public.topics
+  set is_pinned = p_is_pinned
+  where id = p_topic_id;
+
+  if not found then
+    raise exception 'This topic no longer exists.';
+  end if;
+end;
+$$;
+
+revoke all on function public.set_topic_pinned(uuid, boolean) from public, anon, authenticated;
+grant execute on function public.set_topic_pinned(uuid, boolean) to authenticated;
 
 create or replace view public.member_activity as
 with contributions as (
