@@ -735,6 +735,14 @@ button:active {
   font-variant-numeric: tabular-nums;
 }
 
+.member-list-identity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
 .member-list-name {
   min-width: 0;
   color: #8dd7f2;
@@ -748,7 +756,6 @@ button:active {
 }
 
 .member-list-item .member-labels {
-  grid-column: 2 / -1;
   margin-top: 0;
 }
 

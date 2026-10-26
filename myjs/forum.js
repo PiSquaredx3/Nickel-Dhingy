@@ -561,11 +561,13 @@ async function showMembers(pageNumber = 1) {
     for (const [index, member] of data.entries()) {
       const item = makeElement("li", "member-list-item");
       const memberNumber = makeElement("span", "member-number", `#${start + index + 1}`);
+      const memberIdentity = makeElement("div", "member-list-identity");
       const memberName = makeElement("strong", "member-list-name", member.username);
       const joinedDate = makeElement("time", "member-list-date", `Joined ${formatDateOnly(member.created_at)}`);
       joinedDate.dateTime = member.created_at;
-      item.append(memberNumber, memberName, joinedDate);
-      appendMemberLabels(item, member.id, medalsByUser.get(member.id));
+      memberIdentity.append(memberName);
+      appendMemberLabels(memberIdentity, member.id, medalsByUser.get(member.id));
+      item.append(memberNumber, memberIdentity, joinedDate);
       list.append(item);
     }
 
