@@ -38,6 +38,31 @@ const siteTitles = [
 
 const allowedImageTypes = ["image/jpeg", "image/gif", "image/webp", "image/png"];
 const maxImageSize = 2 * 1024 * 1024;
+const emojiNames = [
+  "acute", "aggressive", "air_kiss", "angel", "bad", "bb", "beach", "beee", "big_boss", "biggrin",
+  "blum3", "blush", "boast", "bomb", "boredom", "buba", "buba_phone", "bye", "clapping", "cray",
+  "cray2", "crazy", "curtsey", "dance", "dance2", "dance3", "dance4", "dash1", "dash2", "dash3",
+  "declare", "dirol", "don-t_mention", "download", "drinks", "english_en", "facepalm", "feminist",
+  "feminist_en", "first_move", "flirt", "focus", "fool", "friends", "gamer1", "gamer2", "gamer3",
+  "gamer4", "girl_blum", "girl_cray", "girl_cray2", "girl_cray3", "girl_crazy", "girl_dance",
+  "girl_drink1", "girl_drink3", "girl_drink4", "girl_haha", "girl_hide", "girl_hospital",
+  "girl_impossible", "girl_in_love", "girl_mad", "girl_prepare_fish", "girl_sad", "girl_sigh",
+  "girl_smile", "girl_to_take_umbrage", "girl_to_take_umbrage2", "girl_wacko", "girl_wink",
+  "girl_witch", "give_heart", "give_heart2", "give_rose", "good", "good2", "good3", "heat", "help",
+  "hi", "hunter", "hysteric", "i-m_so_happy", "ireful1", "ireful2", "ireful3", "king", "kiss",
+  "kiss2", "kiss3", "laugh1", "laugh2", "laugh3", "laugh4", "lazy", "lol", "lol2", "mail1", "mamba",
+  "man_in_love", "mda", "mega_shok", "moil", "mosking", "music", "music2", "nea", "negative",
+  "new_russian", "ok", "on_the_quiet", "on_the_quiet2", "paint2", "paint3", "paratrooper",
+  "paratrooper_girl", "pardon", "parting", "party", "party2", "pilot", "pioneer", "pioneer_smoke",
+  "pleasantry", "popcorm1", "popcorm2", "prankster2", "preved", "punish", "read", "rofl",
+  "russian_ru", "sad", "sarcasm", "sarcastic", "sarcastic_blum", "sarcastic_hand", "scare", "scaut",
+  "scaut_en", "scratch_one-s_head", "search", "secret", "sensored", "shok", "shout", "slow", "smile",
+  "smoke", "soldier", "soldier_girl", "sorry", "sorry2", "spruce_up", "stinker", "sun_bespectacled",
+  "superman", "superstition", "swoon", "tease", "tender", "thank_you2", "this", "to_babruysk",
+  "to_become_senile", "to_pick_ones_nose", "to_pick_ones_nose2", "to_take_umbrage", "training1",
+  "umnik2", "unknw", "vampire", "vava", "victory", "wacko", "wacko2", "whistle3", "wild", "wink",
+  "wink2", "wink3", "wizard", "yahoo", "yes3", "yess", "yu"
+];
 
 if (siteTitle) {
   siteTitle.textContent = siteTitles[Math.floor(Math.random() * siteTitles.length)];
@@ -509,6 +534,28 @@ async function showBoard(slug) {
   }
 }
 
+function appendPostBody(container, body) {
+  const tokenPattern = /\[emoji:([A-Za-z0-9_-]+)\]/g;
+  let lastIndex = 0;
+  let match;
+  while ((match = tokenPattern.exec(body)) !== null) {
+    container.append(document.createTextNode(body.slice(lastIndex, match.index)));
+    if (emojiNames.includes(match[1])) {
+      const image = document.createElement("img");
+      image.className = "post-emoji";
+      image.src = `assets/emojis/${match[1]}.gif`;
+      image.alt = `:${match[1]}:`;
+      image.title = `:${match[1]}:`;
+      image.loading = "lazy";
+      container.append(image);
+    } else {
+      container.append(document.createTextNode(match[0]));
+    }
+    lastIndex = tokenPattern.lastIndex;
+  }
+  container.append(document.createTextNode(body.slice(lastIndex)));
+}
+
 function safeHttpsUrl(value) {
   if (!value) return null;
   try {
@@ -575,7 +622,9 @@ function renderPost(profile, date, body, className, imageUrl = null, activity = 
     deleteButton.title = "Remove this post";
     header.append(deleteButton);
   }
-  content.append(header, makeElement("p", "post-body", body));
+  const postBody = makeElement("p", "post-body");
+  appendPostBody(postBody, body);
+  content.append(header, postBody);
   const safeImageUrl = safeHttpsUrl(imageUrl);
   if (safeImageUrl) {
     const image = document.createElement("img");
@@ -692,6 +741,39 @@ function makePostForm(heading, submitLabel, onSubmit, leadingFields = [], includ
   textarea.autocomplete = "off";
   label.append(textarea);
   form.append(label);
+  const emojiPicker = document.createElement("details");
+  emojiPicker.className = "emoji-picker";
+  emojiPicker.append(makeElement("summary", "", "Insert an emoji"));
+  const emojiGrid = makeElement("div", "emoji-grid");
+  for (const name of emojiNames) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "emoji-choice";
+    button.setAttribute("aria-label", `Insert ${name.replaceAll("_", " ")}`);
+    button.title = `:${name}:`;
+    const image = document.createElement("img");
+    image.src = `assets/emojis/${name}.gif`;
+    image.alt = "";
+    image.loading = "lazy";
+    button.append(image);
+    button.addEventListener("click", () => {
+      textarea.setCustomValidity("");
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const token = `[emoji:${name}]`;
+      if (textarea.value.length + token.length - (end - start) > textarea.maxLength) {
+        textarea.setCustomValidity("There isn't enough room in this message for that emoji.");
+        textarea.reportValidity();
+        return;
+      }
+      textarea.setRangeText(token, start, end, "end");
+      textarea.focus();
+    });
+    emojiGrid.append(button);
+  }
+  emojiPicker.append(emojiGrid);
+  textarea.addEventListener("input", () => textarea.setCustomValidity(""));
+  form.append(emojiPicker);
   let imageInput;
   if (includeImage) {
     const imageLabel = makeElement("label", "form-field", "Attach an image (optional)");
