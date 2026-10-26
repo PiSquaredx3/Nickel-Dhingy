@@ -94,8 +94,8 @@ create table if not exists public.boards (
 );
 
 alter table public.boards
-  drop column if exists description,
-  drop column if exists icon;
+  drop column if exists icon,
+  add column if not exists description text not null default '';
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
@@ -260,10 +260,14 @@ create table if not exists public.replies (
   id uuid primary key default gen_random_uuid(),
   topic_id uuid not null references public.topics (id) on delete cascade,
   author_id uuid not null constraint replies_author_id_fkey references public.profiles (id) on delete cascade,
+  parent_reply_id uuid references public.replies (id) on delete set null,
   body text not null,
   created_at timestamptz not null default now(),
   constraint replies_body_length check (char_length(btrim(body)) between 1 and 10000)
 );
+
+alter table public.replies
+  add column if not exists parent_reply_id uuid references public.replies (id) on delete set null;
 
 create index if not exists topics_board_updated_at on public.topics (board_id, updated_at desc);
 create index if not exists topics_board_pinned_updated_at
@@ -271,6 +275,65 @@ create index if not exists topics_board_pinned_updated_at
 create index if not exists topics_author_id on public.topics (author_id);
 create index if not exists replies_topic_created_at on public.replies (topic_id, created_at);
 create index if not exists replies_author_id on public.replies (author_id);
+create index if not exists replies_parent_reply_id on public.replies (parent_reply_id);
+
+create or replace function public.validate_reply_parent()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+declare
+  parent_topic_id uuid;
+begin
+  if new.parent_reply_id is null then
+    return new;
+  end if;
+  if new.parent_reply_id = new.id then
+    raise exception 'A reply cannot target itself.';
+  end if;
+
+  select topic_id into parent_topic_id
+  from public.replies
+  where id = new.parent_reply_id;
+
+  if parent_topic_id is null then
+    raise exception 'The reply being referenced no longer exists.';
+  end if;
+  if parent_topic_id <> new.topic_id then
+    raise exception 'Replies can only target a reply in the same topic.';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists validate_reply_parent on public.replies;
+create trigger validate_reply_parent
+  before insert or update of parent_reply_id, topic_id on public.replies
+  for each row execute procedure public.validate_reply_parent();
+
+create table if not exists public.reply_notifications (
+  id uuid primary key default gen_random_uuid(),
+  recipient_id uuid not null references public.profiles (id) on delete cascade,
+  reply_id uuid not null references public.replies (id) on delete cascade,
+  notification_type text not null default 'topic' check (notification_type in ('topic', 'reply')),
+  created_at timestamptz not null default now(),
+  read_at timestamptz,
+  unique (recipient_id, reply_id)
+);
+
+alter table public.reply_notifications
+  add column if not exists notification_type text not null default 'topic';
+
+alter table public.reply_notifications
+  drop constraint if exists reply_notifications_notification_type_check,
+  add constraint reply_notifications_notification_type_check
+    check (notification_type in ('topic', 'reply'));
+
+create index if not exists reply_notifications_recipient_created_at
+  on public.reply_notifications (recipient_id, created_at desc);
+create index if not exists reply_notifications_unread_recipient
+  on public.reply_notifications (recipient_id)
+  where read_at is null;
 
 create or replace function public.prevent_non_moderator_topic_pin_change()
 returns trigger
@@ -407,11 +470,15 @@ create table if not exists public.post_votes (
   topic_id uuid references public.topics (id) on delete cascade,
   reply_id uuid references public.replies (id) on delete cascade,
   voter_id uuid not null references public.profiles (id) on delete cascade,
+  is_positive boolean not null default true,
   is_moderator boolean not null default false,
   is_pi boolean not null default false,
   created_at timestamptz not null default now(),
   constraint post_votes_one_target check (num_nonnulls(topic_id, reply_id) = 1)
 );
+
+alter table public.post_votes
+  add column if not exists is_positive boolean not null default true;
 
 create unique index if not exists post_votes_topic_voter
   on public.post_votes (topic_id, voter_id)
@@ -485,28 +552,17 @@ as
 with posts as (
   select 'topic'::text as post_type, id as post_id, author_id
   from public.topics
-  union all
-  select 'reply'::text as post_type, id as post_id, author_id
-  from public.replies
 ),
 vote_summary as (
   select
-    case when topic_id is not null then 'topic' else 'reply' end::text as post_type,
-    coalesce(topic_id, reply_id) as post_id,
+    'topic'::text as post_type,
+    topic_id as post_id,
     count(*)::integer as vote_count,
+    count(*) filter (where is_positive)::integer as positive_vote_count,
+    bool_or(is_positive) filter (where voter_id = (select auth.uid())) as user_vote,
     coalesce(bool_or(voter_id = (select auth.uid())), false) as voted_by_user
   from public.post_votes
-  group by 1, 2
-),
-medal_vote_summary as (
-  select
-    case when topic_id is not null then 'topic' else 'reply' end::text as post_type,
-    coalesce(topic_id, reply_id) as post_id,
-    sum(case when is_pi then 0 when is_moderator then 10 else 1 end)::integer as weighted_vote_count,
-    coalesce(bool_or(is_moderator and not is_pi), false) as moderator_awarded,
-    coalesce(bool_or(is_pi), false) as pi_awarded
-  from public.post_votes
-  where created_at >= (select reset_at from public.post_medal_settings where singleton)
+  where topic_id is not null
   group by 1, 2
 )
 select
@@ -515,20 +571,15 @@ select
   p.author_id,
   coalesce(v.vote_count, 0)::integer as vote_count,
   coalesce(v.voted_by_user, false) as voted_by_user,
-  (coalesce(m.weighted_vote_count, 0) >= 10) as bronze_awarded,
-  coalesce(m.moderator_awarded, false) as silver_awarded,
-  coalesce(m.pi_awarded, false) as gold_awarded,
-  greatest(
-    case
-      when coalesce(m.weighted_vote_count, 0) >= 10
-        then coalesce(m.weighted_vote_count, 0) / 10
-      else 0
-    end,
-    case when coalesce(m.moderator_awarded, false) then 1 else 0 end
-  )::integer as bronze_count
+  false as bronze_awarded,
+  false as silver_awarded,
+  false as gold_awarded,
+  0::integer as bronze_count,
+  coalesce(v.positive_vote_count, 0)::integer as positive_vote_count,
+  round(v.positive_vote_count::numeric / nullif(v.vote_count, 0), 2) as post_rating,
+  v.user_vote
 from posts p
-left join vote_summary v using (post_type, post_id)
-left join medal_vote_summary m using (post_type, post_id);
+left join vote_summary v using (post_type, post_id);
 
 create or replace view public.member_medals
 with (security_invoker = true)
@@ -557,7 +608,39 @@ select
   (gold_earned + silver_total / 10)::integer as gold_count
 from silver_conversions;
 
-create or replace function public.cast_post_vote(p_topic_id uuid default null, p_reply_id uuid default null)
+create or replace view public.member_ratings
+with (security_invoker = true)
+as
+with member_vote_totals as (
+  select
+    p.id as user_id,
+    count(pv.id)::integer as vote_count,
+    count(pv.id) filter (where pv.is_positive)::integer as positive_vote_count
+  from public.profiles p
+  left join public.topics t on t.author_id = p.id
+  left join public.post_votes pv on pv.topic_id = t.id
+  group by p.id
+)
+select
+  user_id,
+  vote_count,
+  positive_vote_count,
+  round(positive_vote_count::numeric / nullif(vote_count, 0), 4) as overall_rating,
+  case
+    when vote_count >= 10 and positive_vote_count::numeric / vote_count >= 0.90 then 'gold'
+    when vote_count >= 10 and positive_vote_count::numeric / vote_count >= 0.75 then 'silver'
+    when vote_count >= 10 and positive_vote_count::numeric / vote_count >= 0.65 then 'bronze'
+    else null
+  end::text as badge_tier
+from member_vote_totals;
+
+drop function if exists public.cast_post_vote(uuid, uuid);
+
+create or replace function public.cast_post_vote(
+  p_topic_id uuid default null,
+  p_reply_id uuid default null,
+  p_is_positive boolean default true
+)
 returns void
 language plpgsql
 security definer
@@ -575,24 +658,22 @@ declare
   voter_is_pi boolean;
 begin
   if voter_user_id is null then
-    raise exception 'Sign in to vote on a post.';
+    raise exception 'Sign in to rate a post.';
   end if;
 
   if (p_topic_id is null) = (p_reply_id is null) then
-    raise exception 'Choose exactly one post to vote on.';
+    raise exception 'Choose exactly one post to rate.';
+  end if;
+
+  if p_reply_id is not null then
+    raise exception 'Only topic posts can be rated.';
   end if;
 
   perform pg_advisory_xact_lock(hashtextextended(voter_user_id::text, 0));
 
-  if p_topic_id is not null then
-    select author_id into target_author_id
-    from public.topics
-    where id = p_topic_id;
-  else
-    select author_id into target_author_id
-    from public.replies
-    where id = p_reply_id;
-  end if;
+  select author_id into target_author_id
+  from public.topics
+  where id = p_topic_id;
 
   if target_author_id is null then
     raise exception 'This post no longer exists.';
@@ -602,16 +683,11 @@ begin
     raise exception 'You cannot vote on your own post.';
   end if;
 
-  if p_topic_id is not null and exists (
+  if exists (
     select 1 from public.post_votes
     where topic_id = p_topic_id and voter_id = voter_user_id
   ) then
-    raise exception 'You have already voted on this post.';
-  elsif p_reply_id is not null and exists (
-    select 1 from public.post_votes
-    where reply_id = p_reply_id and voter_id = voter_user_id
-  ) then
-    raise exception 'You have already voted on this post.';
+    raise exception 'You have already rated this post.';
   end if;
 
   select created_at into account_created_at
@@ -648,10 +724,12 @@ begin
     vote_day_start := date_trunc('day', now() at time zone 'UTC') at time zone 'UTC';
     select count(*)::integer into daily_vote_count
     from public.post_votes
-    where voter_id = voter_user_id and created_at >= vote_day_start;
+    where topic_id is not null
+      and voter_id = voter_user_id
+      and created_at >= vote_day_start;
 
     if daily_vote_count >= 3 then
-      raise exception 'You have reached the limit of 3 votes for today.';
+      raise exception 'You have reached the limit of 3 ratings for today.';
     end if;
   end if;
 
@@ -659,16 +737,16 @@ begin
     select 1 from public.profiles where id = voter_user_id and username = 'pi_'
   ) into voter_is_pi;
 
-  insert into public.post_votes (topic_id, reply_id, voter_id, is_moderator, is_pi)
-  values (p_topic_id, p_reply_id, voter_user_id, voter_is_moderator, voter_is_pi);
+  insert into public.post_votes (topic_id, reply_id, voter_id, is_positive, is_moderator, is_pi)
+  values (p_topic_id, p_reply_id, voter_user_id, p_is_positive, voter_is_moderator, voter_is_pi);
 end;
 $$;
 
 revoke all on public.post_votes from public, anon, authenticated;
 grant select on public.post_votes to anon, authenticated;
-revoke all on function public.cast_post_vote(uuid, uuid) from public, anon, authenticated;
-grant execute on function public.cast_post_vote(uuid, uuid) to authenticated;
-grant select on public.post_awards, public.member_medals to anon, authenticated;
+revoke all on function public.cast_post_vote(uuid, uuid, boolean) from public, anon, authenticated;
+grant execute on function public.cast_post_vote(uuid, uuid, boolean) to authenticated;
+grant select on public.post_awards, public.member_medals, public.member_ratings to anon, authenticated;
 
 update public.boards
 set position = position + (
@@ -703,23 +781,22 @@ where slug in (
   'sega-other-classics', 'off-topic', 'music'
 );
 
-insert into public.boards (slug, title, category, position)
+insert into public.boards (slug, title, description, category, position)
 values
-  ('general', 'General', 'BOARDS', 1),
-  ('clips-images', 'Clips & Images', 'BOARDS', 2),
-  ('art', 'Art', 'BOARDS', 3),
-  ('games-recommendations', 'Games & Recommendations', 'BOARDS', 4),
-  ('general-2', 'General 2', 'EVEN MORE BOARDS', 5),
-  ('lolwhat', 'lolwhat', 'EVEN MORE BOARDS', 6),
-  ('anime', 'Anime', 'EVEN MORE BOARDS', 7),
-  ('movies-tv', 'Movies & TV', 'EVEN MORE BOARDS', 8),
-  ('music-discussion', 'Music Discussion', 'EVEN MORE BOARDS', 9),
-  ('hobbies-projects', 'Hobbies & Projects', 'EVEN MORE BOARDS', 10),
-  ('books-comics', 'Books & Comics', 'EVEN MORE BOARDS', 11),
-  ('rathner', 'Airmen Rathners Personal Poop Board', 'EVEN MORE BOARDS', 12),
-  ('question-of-the-day', 'Question of the Day', 'DAILY QUESTION', 13)
+  ('general', 'Any&All', 'General conversation, questions, and topics that do not fit another board.', 'BOARDS', 1),
+  ('clips-images', 'Any&All Clips & Images', 'Share screenshots, clips, photos, and other images.', 'BOARDS', 2),
+  ('art', 'Any&All Art', 'Any&All Art Discussions', 'BOARDS', 3),
+  ('games-recommendations', 'Any&All Games', 'Talk about games, ask for recommendations, and share what you are playing.', 'BOARDS', 4),
+  ('anime', 'Any&All Anime', 'Discuss anime, manga, characters, and recommendations; use spoiler warnings as needed.', 'EVEN MORE BOARDS', 5),
+  ('movies-tv', 'Any&All Movies & TV', 'Talk about films and television, share recommendations; use spoiler warnings as needed.', 'EVEN MORE BOARDS', 6),
+  ('music-discussion', 'Any&All Music Discussion', 'Share music, artists, albums, and playlists, and talk about what you are listening to.', 'EVEN MORE BOARDS', 7),
+  ('hobbies-projects', 'Any&All Hobbies & Projects', 'Show what you are making or learning, ask for advice, and share progress updates.', 'EVEN MORE BOARDS', 8),
+  ('lolwhat', 'lolwhat', 'cesspool', 'EVEN MORE BOARDS', 9),
+  ('books-comics', 'Any&All Writing', 'Discuss books, comics, and what you are reading; use spoiler warnings as needed.', 'EVEN MORE BOARDS', 10),
+  ('question-of-the-day', 'Question of the Day Archive', 'Archive of the daily questions.', 'DAILY QUESTION', 11)
 on conflict (slug) do update set
   title = excluded.title,
+  description = excluded.description,
   category = excluded.category,
   position = excluded.position;
 
@@ -728,18 +805,25 @@ set board_id = (select id from public.boards where slug = 'art')
 where board_id = (select id from public.boards where slug = 'art-projects');
 
 update public.topics
-set board_id = (select id from public.boards where slug = 'general-2')
+set board_id = (select id from public.boards where slug = 'general')
 where board_id in (
   select id
   from public.boards
   where lower(btrim(title)) in ('tech & internet', 'food & drink')
 );
 
+update public.topics
+set board_id = (select id from public.boards where slug = 'general')
+where board_id = (select id from public.boards where slug = 'general-2');
+
 delete from public.boards
 where slug in (
   'art-projects', 'rpg-strategy', 'action-shooters',
   'nintendo', 'playstation', 'xbox', 'sega-other-consoles'
 );
+
+delete from public.boards
+where slug = 'general-2';
 
 delete from public.boards
 where lower(btrim(title)) in ('tech & internet', 'food & drink');
@@ -795,10 +879,52 @@ create trigger on_reply_change_touch_topic
   after insert or delete on public.replies
   for each row execute procedure public.touch_topic_on_reply();
 
+create or replace function public.notify_on_reply()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  topic_author_id uuid;
+  parent_author_id uuid;
+begin
+  select author_id into topic_author_id
+  from public.topics
+  where id = new.topic_id;
+
+  if topic_author_id is not null and topic_author_id <> new.author_id then
+    insert into public.reply_notifications (recipient_id, reply_id, notification_type)
+    values (topic_author_id, new.id, 'topic')
+    on conflict (recipient_id, reply_id) do nothing;
+  end if;
+
+  if new.parent_reply_id is not null then
+    select author_id into parent_author_id
+    from public.replies
+    where id = new.parent_reply_id;
+
+    if parent_author_id is not null and parent_author_id <> new.author_id then
+      insert into public.reply_notifications (recipient_id, reply_id, notification_type)
+      values (parent_author_id, new.id, 'reply')
+      on conflict (recipient_id, reply_id)
+      do update set notification_type = excluded.notification_type;
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_reply_create_notification on public.replies;
+create trigger on_reply_create_notification
+  after insert on public.replies
+  for each row execute procedure public.notify_on_reply();
+
 alter table public.profiles enable row level security;
 alter table public.boards enable row level security;
 alter table public.topics enable row level security;
 alter table public.replies enable row level security;
+alter table public.reply_notifications enable row level security;
 
 drop policy if exists "Profiles are publicly readable" on public.profiles;
 create policy "Profiles are publicly readable"
@@ -958,6 +1084,38 @@ create policy "Members can delete their own replies"
       where user_id = (select auth.uid())
     )
   );
+
+drop policy if exists "Members can read their reply notifications" on public.reply_notifications;
+create policy "Members can read their reply notifications"
+  on public.reply_notifications for select to authenticated
+  using ((select auth.uid()) = recipient_id);
+
+create or replace function public.mark_reply_notification_read(p_notification_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'Sign in to update notifications.';
+  end if;
+
+  update public.reply_notifications
+  set read_at = coalesce(read_at, now())
+  where id = p_notification_id
+    and recipient_id = (select auth.uid());
+  if not found then
+    raise exception 'This notification is unavailable.';
+  end if;
+end;
+$$;
+
+revoke all on function public.mark_reply_notification_read(uuid) from public, anon, authenticated;
+grant execute on function public.mark_reply_notification_read(uuid) to authenticated;
+
+revoke all on public.reply_notifications from public, anon, authenticated;
+grant select on public.reply_notifications to authenticated;
 
 grant select on public.boards, public.profiles, public.topics, public.replies to anon, authenticated;
 grant update on public.profiles to authenticated;

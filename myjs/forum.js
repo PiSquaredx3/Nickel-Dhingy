@@ -6,6 +6,7 @@ const boardView = document.querySelector("#board-view");
 const topicView = document.querySelector("#topic-view");
 const composerView = document.querySelector("#composer-view");
 const membersView = document.querySelector("#members-view");
+const notificationsView = document.querySelector("#notifications-view");
 const navLinks = document.querySelectorAll("[data-page-nav]");
 const indexPanel = document.querySelector(".forum-table-wrap");
 const authDialog = document.querySelector("#auth-dialog");
@@ -21,8 +22,8 @@ const authPassword = authForm.elements.password;
 const authForgot = document.querySelector("#auth-forgot");
 const authSwitch = document.querySelector("#auth-switch");
 const siteTitle = document.querySelector(".site-title");
-const medalCaseStatus = document.querySelector("#medal-case-status");
-const medalShelves = document.querySelector("#medal-shelves");
+const ratingBadgeStatus = document.querySelector("#rating-badge-status");
+const ratingBadgeDisplay = document.querySelector("#rating-badge-display");
 const authMode = { value: "signup" };
 const legacyBoardSlugs = {
   "dos-windows": "general",
@@ -37,16 +38,19 @@ const legacyBoardSlugs = {
   playstation: "games-recommendations",
   xbox: "games-recommendations",
   "sega-other-consoles": "games-recommendations",
-  "off-topic": "general-2",
+  "off-topic": "general",
+  "general-2": "general",
   music: "music-discussion"
 };
 let supabase;
 let currentUser;
 let boards = [];
 let moderatorIds = new Set();
-let medalCaseRequest = 0;
+let ratingBadgeRequest = 0;
 let membersRequest = 0;
 let boardTopicsRequest = 0;
+let notificationsRequest = 0;
+let notificationCountRequest = 0;
 const membersPerPage = 25;
 const dailyQuestionBoardSlug = "question-of-the-day";
 const dailyQuestionDurationMs = 24 * 60 * 60 * 1000;
@@ -154,82 +158,94 @@ async function loadMemberActivity(userIds) {
   return new Map(data.map(activity => [activity.user_id, activity]));
 }
 
-async function loadMemberMedals(userIds) {
+async function loadMemberRatings(userIds) {
   const ids = [...new Set(userIds.filter(Boolean))];
   if (!ids.length) return new Map();
-  const { data, error } = await supabase.from("member_medals")
-    .select("user_id,bronze_count,silver_count,gold_count")
+  const { data, error } = await supabase.from("member_ratings")
+    .select("user_id,vote_count,positive_vote_count,overall_rating,badge_tier")
     .in("user_id", ids);
   if (error) throw error;
-  return new Map(data.map(medals => [medals.user_id, medals]));
+  return new Map(data.map(rating => [rating.user_id, rating]));
 }
 
-async function updateMedalCase(user) {
-  const request = ++medalCaseRequest;
+async function updateRatingBadge(user) {
+  const request = ++ratingBadgeRequest;
   if (!user) {
-    medalShelves.hidden = true;
-    medalCaseStatus.hidden = false;
-    medalCaseStatus.textContent = "Sign in to see your medals.";
+    ratingBadgeDisplay.replaceChildren();
+    ratingBadgeDisplay.hidden = true;
+    ratingBadgeStatus.hidden = false;
+    ratingBadgeStatus.textContent = "Sign in to see your rating badge.";
     return;
   }
 
-  medalCaseStatus.hidden = false;
-  medalCaseStatus.textContent = "Loading your medals…";
-  medalShelves.hidden = true;
+  ratingBadgeDisplay.replaceChildren();
+  ratingBadgeDisplay.hidden = true;
+  ratingBadgeStatus.hidden = false;
+  ratingBadgeStatus.textContent = "Loading your overall rating…";
 
   try {
-    const medalsByUser = await loadMemberMedals([user.id]);
-    if (request !== medalCaseRequest || currentUser?.id !== user.id) return;
-    const medals = medalsByUser.get(user.id) || {};
-    const tiers = [
-      { name: "Gold", key: "gold_count", className: "medal-icon-gold", target: "#gold-medal-tokens" },
-      { name: "Silver", key: "silver_count", className: "medal-icon-silver", target: "#silver-medal-tokens" },
-      { name: "Bronze", key: "bronze_count", className: "medal-icon-bronze", target: "#bronze-medal-tokens" }
-    ];
-    let medalCount = 0;
-
-    for (const tier of tiers) {
-      const count = medals[tier.key] || 0;
-      medalCount += count;
-      const tokens = document.querySelector(tier.target);
-      tokens.replaceChildren();
-      for (let index = 0; index < count; index += 1) {
-        const token = document.createElement("img");
-        token.className = `medal-token ${tier.className}`;
-        token.src = "assets/silk-icons/star.png";
-        token.alt = `${tier.name} medal`;
-        token.title = `${tier.name} medal`;
-        tokens.append(token);
-      }
-    }
-
-    if (!medalCount) {
-      medalCaseStatus.textContent = "Your Medal Case is empty.... Post to earn some!";
-      medalCaseStatus.hidden = false;
-      medalShelves.hidden = true;
+    const ratingsByUser = await loadMemberRatings([user.id]);
+    if (request !== ratingBadgeRequest || currentUser?.id !== user.id) return;
+    const rating = ratingsByUser.get(user.id);
+    if (!rating?.badge_tier) {
+      ratingBadgeStatus.textContent = rating?.vote_count
+        ? `Overall rating: ${formatOverallRating(rating)}. ${
+          rating.vote_count < 10
+            ? "At least 10 topic ratings are needed for a badge."
+            : "A badge starts at 65%."
+        }`
+        : "Rate other members' topics to start earning a rating badge.";
       return;
     }
-    medalCaseStatus.textContent = "";
-    medalCaseStatus.hidden = true;
-    medalShelves.hidden = false;
+    ratingBadgeStatus.hidden = true;
+    ratingBadgeDisplay.hidden = false;
+    const badge = makeRatingBadge(rating);
+    if (!badge) throw new Error(`Unknown rating badge tier: ${rating.badge_tier}`);
+    ratingBadgeDisplay.append(badge, makeElement("span", "rating-badge-summary", formatOverallRating(rating)));
   } catch (error) {
-    if (request !== medalCaseRequest || currentUser?.id !== user.id) return;
-    console.error("Could not load your medal case:", error);
-    medalCaseStatus.textContent = `Could not load your medals: ${error.message}`;
+    if (request !== ratingBadgeRequest || currentUser?.id !== user.id) return;
+    console.error("Could not load your rating badge:", error);
+    ratingBadgeStatus.textContent = `Could not load your rating badge: ${error.message}`;
   }
 }
 
 async function loadPostAwards(postType, postIds) {
   if (!postIds.length) return new Map();
   const { data, error } = await supabase.from("post_awards")
-    .select("post_type,post_id,author_id,vote_count,voted_by_user,bronze_awarded,bronze_count,silver_awarded,gold_awarded")
+    .select("post_type,post_id,vote_count,positive_vote_count,post_rating,user_vote,voted_by_user")
     .eq("post_type", postType)
     .in("post_id", postIds);
   if (error) throw error;
   return new Map(data.map(award => [`${award.post_type}:${award.post_id}`, award]));
 }
 
-function appendMemberLabels(container, userId, medals) {
+function formatPostRating(award) {
+  const ratingCount = award?.vote_count || 0;
+  if (!ratingCount) return "No ratings";
+  return `${Number(award.post_rating).toFixed(2)} / 1.00 · ${ratingCount} ${ratingCount === 1 ? "rating" : "ratings"}`;
+}
+
+function formatOverallRating(rating) {
+  if (!rating?.vote_count) return "No ratings yet";
+  const percentage = (Number(rating.overall_rating) * 100).toFixed(1);
+  return `${percentage}% from ${rating.vote_count} topic ${rating.vote_count === 1 ? "rating" : "ratings"}`;
+}
+
+function makeRatingBadge(rating) {
+  const tier = {
+    bronze: ["Bronze", "medal-bronze"],
+    silver: ["Silver", "medal-silver"],
+    gold: ["Gold", "medal-gold"]
+  }[rating.badge_tier];
+  if (!tier) return null;
+  const [name, className] = tier;
+  const badge = makeMedalBadge(name, className);
+  badge.title = `${name} badge · Overall post rating: ${formatOverallRating(rating)}`;
+  badge.setAttribute("aria-label", badge.title);
+  return badge;
+}
+
+function appendMemberLabels(container, userId, rating) {
   const labels = makeElement("span", "member-labels");
   let hasLabels = false;
   if (moderatorIds.has(userId)) {
@@ -237,16 +253,12 @@ function appendMemberLabels(container, userId, medals) {
     hasLabels = true;
   }
 
-  for (const [name, className, count] of [
-    ["Bronze", "medal-bronze", medals?.bronze_count],
-    ["Silver", "medal-silver", medals?.silver_count],
-    ["Gold", "medal-gold", medals?.gold_count]
-  ]) {
-    if (!count) continue;
-    const badge = makeMedalBadge(name, className);
-    badge.title = `${count} ${name} medal${count === 1 ? "" : "s"} earned`;
-    labels.append(badge);
-    hasLabels = true;
+  if (rating?.badge_tier) {
+    const badge = makeRatingBadge(rating);
+    if (badge) {
+      labels.append(badge);
+      hasLabels = true;
+    }
   }
 
   if (hasLabels) container.append(labels);
@@ -275,56 +287,6 @@ function makeModeratorBadge() {
   return badge;
 }
 
-function appendMemberMedalStars(container, medals) {
-  const tiers = [
-    ["Bronze", "medal-bronze", medals?.bronze_count || 0],
-    ["Silver", "medal-silver", medals?.silver_count || 0],
-    ["Gold", "medal-gold", medals?.gold_count || 0]
-  ];
-  const totalCount = tiers.reduce((total, [, , count]) => total + count, 0);
-  if (!totalCount) return;
-
-  const stars = makeElement("span", "post-author-medals");
-  const description = [];
-  for (const [name, className, count] of tiers) {
-    if (!count) continue;
-    description.push(`${count} ${name}`);
-    for (let index = 0; index < count; index += 1) {
-      stars.append(makeMedalBadge(name, className));
-    }
-  }
-  const label = `Member medals: ${description.join(", ")}`;
-  stars.setAttribute("role", "img");
-  stars.setAttribute("aria-label", label);
-  stars.title = label;
-  container.append(stars);
-}
-
-function appendPostAwardBadges(container, award) {
-  if (!award) return;
-  const tiers = [
-    ["Bronze", "medal-bronze", award.bronze_count || 0],
-    ["Silver", "medal-silver", award.silver_awarded ? 1 : 0],
-    ["Gold", "medal-gold", award.gold_awarded ? 1 : 0]
-  ];
-  const earned = tiers.filter(([, , count]) => count > 0);
-  if (!earned.length) return;
-
-  const badges = makeElement("span", "post-award-badges");
-  const description = `Post medals: ${earned.map(([name, , count]) =>
-    `${count} ${name} medal${count === 1 ? "" : "s"}`
-  ).join(", ")}`;
-  badges.setAttribute("role", "img");
-  badges.setAttribute("aria-label", description);
-  badges.title = description;
-  for (const [name, className, count] of earned) {
-    for (let index = 0; index < count; index += 1) {
-      badges.append(makeMedalBadge(name, className));
-    }
-  }
-  container.append(badges);
-}
-
 function setStat(name, value) {
   document.querySelectorAll(`[data-stat="${name}"]`).forEach(element => {
     element.textContent = value.toLocaleString();
@@ -332,8 +294,10 @@ function setStat(name, value) {
 }
 
 function updateAccount(user) {
+  const previousUserId = currentUser?.id;
   currentUser = user;
-  void updateMedalCase(user);
+  if (previousUserId !== user?.id) notificationsRequest++;
+  void updateRatingBadge(user);
   const links = document.querySelector("#account-links");
   links.replaceChildren();
 
@@ -349,12 +313,45 @@ function updateAccount(user) {
       profileButton.append(moderatorBadge);
     }
     links.append(profileButton);
+    const notificationControl = makeElement("span", "notification-control");
+    const notificationsButton = makeButton("", "notifications", "notification-button");
+    notificationsButton.setAttribute("aria-label", "Notifications");
+    notificationsButton.append(addSilkIcon(makeElement("span", "notification-icon"), "comment"));
+    const notificationCount = makeElement("span", "notification-count", "0");
+    notificationCount.dataset.notificationCount = "";
+    notificationCount.hidden = true;
+    notificationControl.append(notificationsButton, notificationCount);
+    links.append(notificationControl);
     links.append(makeButton("Log out", "logout", "text-button"));
     void loadAccountAvatar(user.id, avatar);
+    void refreshNotificationCount(user.id);
   } else {
     links.append(makeButton("Sign up", "auth-signup", "text-button"));
     links.append(makeElement("span", "", "|"));
     links.append(makeButton("Log in", "auth-login", "text-button"));
+  }
+}
+
+async function refreshNotificationCount(userId) {
+  const request = ++notificationCountRequest;
+  if (!userId) return;
+  try {
+    const { count, error } = await supabase.from("reply_notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("recipient_id", userId)
+      .is("read_at", null);
+    if (error) throw error;
+    if (request !== notificationCountRequest || currentUser?.id !== userId) return;
+    const badge = document.querySelector("[data-notification-count]");
+    if (!badge) return;
+    badge.textContent = (count || 0) > 99 ? "99+" : String(count || 0);
+    badge.hidden = !count;
+    const button = badge.parentElement.querySelector("button");
+    button.setAttribute("aria-label", `Notifications${count ? `, ${count} unread` : ""}`);
+  } catch (error) {
+    if (request !== notificationCountRequest || currentUser?.id !== userId) return;
+    console.error("Could not load notification count:", error);
+    setForumMessage(`Could not load notifications: ${error.message}`, true);
   }
 }
 
@@ -404,6 +401,9 @@ function renderBoards() {
     const link = makeElement("a", "forum-name", board.title);
     link.href = `#board/${encodeURIComponent(board.slug)}`;
     nameCell.append(link);
+    if (board.description) {
+      nameCell.append(makeElement("p", "forum-description", board.description));
+    }
 
     const topicCount = makeElement("td", "count-column", (board.topicCount || 0).toLocaleString());
     const replyCount = makeElement("td", "count-column", (board.replyCount || 0).toLocaleString());
@@ -428,7 +428,7 @@ function renderBoards() {
 
 async function loadBoards() {
   const { data, error } = await supabase.from("boards")
-    .select("id,slug,title,category,position")
+    .select("id,slug,title,description,category,position")
     .order("position");
   if (error) throw error;
 
@@ -487,6 +487,20 @@ async function loadLatestDiscussions() {
   if (error) throw error;
 
   const list = document.querySelector("#latest-discussions");
+  const [awardsByTopic, latestReplies] = await Promise.all([
+    loadPostAwards("topic", data.map(topic => topic.id)),
+    Promise.all(data.map(async topic => {
+      const { data: reply, error: replyError } = await supabase.from("replies")
+        .select("body,created_at,profiles!replies_author_id_fkey(username)")
+        .eq("topic_id", topic.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (replyError) throw replyError;
+      return [topic.id, reply];
+    }))
+  ]);
+  const latestReplyByTopic = new Map(latestReplies);
   list.replaceChildren();
   if (!data.length) {
     list.append(makeElement("li", "latest-empty", "No discussions yet. Start the first one!"));
@@ -501,8 +515,22 @@ async function loadLatestDiscussions() {
     link.href = `#topic/${topic.id}`;
     item.append(
       link,
-      makeElement("span", "latest-topic-meta", `${topic.boards?.title || "Forum"} · ${topic.profiles?.username || "member"}`)
+      makeElement(
+        "span",
+        "latest-topic-meta",
+        `${topic.boards?.title || "Forum"} · ${topic.profiles?.username || "member"} · ${formatPostRating(awardsByTopic.get(`topic:${topic.id}`))}`
+      )
     );
+    const latestReply = latestReplyByTopic.get(topic.id);
+    if (latestReply) {
+      const preview = makeElement(
+        "p",
+        "latest-reply-preview",
+        `↳ ${latestReply.profiles?.username || "member"}: ${latestReply.body}`
+      );
+      preview.title = latestReply.body;
+      item.append(preview);
+    }
     appendMemberLabels(item, topic.profiles?.id, null);
     list.append(item);
   }
@@ -565,6 +593,7 @@ async function showMembers(pageNumber = 1) {
   boardView.hidden = true;
   topicView.hidden = true;
   composerView.hidden = true;
+  notificationsView.hidden = true;
   membersView.hidden = false;
   membersView.replaceChildren(
     makeElement("h2", "view-title", "Members"),
@@ -587,7 +616,7 @@ async function showMembers(pageNumber = 1) {
       return;
     }
 
-    const medalsByUser = await loadMemberMedals(data.map(member => member.id));
+    const ratingsByUser = await loadMemberRatings(data.map(member => member.id));
     if (request !== membersRequest) return;
     const list = makeElement("ol", "member-list");
     list.start = start + 1;
@@ -602,7 +631,7 @@ async function showMembers(pageNumber = 1) {
       const joinedDate = makeElement("time", "member-list-date", `Joined ${formatDateOnly(member.created_at)}`);
       joinedDate.dateTime = member.created_at;
       memberIdentity.append(memberName);
-      appendMemberLabels(memberIdentity, member.id, medalsByUser.get(member.id));
+      appendMemberLabels(memberIdentity, member.id, ratingsByUser.get(member.id));
       item.append(memberNumber, memberIdentity, joinedDate);
       list.append(item);
     }
@@ -637,8 +666,82 @@ async function showMembers(pageNumber = 1) {
   }
 }
 
+async function showNotifications() {
+  const request = ++notificationsRequest;
+  const userId = currentUser?.id;
+  indexPanel.hidden = true;
+  boardView.hidden = true;
+  topicView.hidden = true;
+  composerView.hidden = true;
+  membersView.hidden = true;
+  notificationsView.hidden = false;
+  notificationsView.replaceChildren(
+    makeElement("h2", "view-title", "Notifications"),
+    makeElement("p", "empty-state", "Loading notifications…")
+  );
+
+  if (!currentUser) {
+    const prompt = makeElement("p", "empty-state", "Sign in to view replies to your posts.");
+    prompt.append(" ", makeButton("Log in", "auth-login"));
+    notificationsView.replaceChildren(makeElement("h2", "view-title", "Notifications"), prompt);
+    return;
+  }
+
+  try {
+    const { data, error } = await supabase.from("reply_notifications")
+      .select("id,notification_type,created_at,read_at,replies!reply_notifications_reply_id_fkey(id,body,created_at,parent_reply_id,profiles!replies_author_id_fkey(username),topics!replies_topic_id_fkey(id,title))")
+      .eq("recipient_id", userId)
+      .order("created_at", { ascending: false })
+      .range(0, 49);
+    if (error) throw error;
+    if (request !== notificationsRequest || currentUser?.id !== userId || !notificationsView.isConnected) return;
+
+    const list = makeElement("ul", "notification-list");
+    for (const notification of data) {
+      const reply = notification.replies;
+      if (!reply?.topics) continue;
+      const item = makeElement("li", `notification-item${notification.read_at ? "" : " notification-unread"}`);
+      const actor = reply.profiles?.username || "A member";
+      const action = notification.notification_type === "reply"
+        ? "replied to your reply in"
+        : "replied to your topic";
+      const topicLink = makeElement("a", "notification-topic-link", reply.topics.title);
+      topicLink.href = `#topic/${reply.topics.id}`;
+      const summary = makeElement("p", "notification-summary");
+      summary.append(
+        document.createTextNode(`${actor} ${action} `),
+        topicLink,
+        document.createTextNode(` · ${formatDate(notification.created_at)}`)
+      );
+      const body = makeElement("p", "notification-reply-body", reply.body);
+      item.append(summary, body);
+      if (!notification.read_at) {
+        item.append(makeButton("Mark as read", `mark-notification:${notification.id}`, "small-button notification-read-button"));
+      }
+      list.append(item);
+    }
+    if (!list.childElementCount) {
+      list.append(makeElement("li", "empty-state", "No replies to your posts yet."));
+    }
+    notificationsView.replaceChildren(
+      makeElement("h2", "view-title", "Notifications"),
+      makeElement("p", "member-list-summary", "Replies to topics you started and direct replies to your replies."),
+      list
+    );
+    await refreshNotificationCount(userId);
+  } catch (error) {
+    if (request !== notificationsRequest || currentUser?.id !== userId) return;
+    console.error("Could not load notifications:", error);
+    notificationsView.replaceChildren(
+      makeElement("h2", "view-title", "Notifications"),
+      makeElement("p", "form-message error-message", `Could not load notifications: ${error.message}`)
+    );
+  }
+}
+
 async function showBoard(slug) {
   membersView.hidden = true;
+  notificationsView.hidden = true;
   boardTopicsRequest++;
   const board = boards.find(item => item.slug === slug);
   if (!board) {
@@ -652,6 +755,9 @@ async function showBoard(slug) {
   boardView.replaceChildren();
   appendBackLink(boardView);
   boardView.append(makeElement("h2", "view-title", board.title));
+  if (board.description) {
+    boardView.append(makeElement("p", "board-description", board.description));
+  }
   if (board.slug === dailyQuestionBoardSlug) {
     boardView.append(makeElement(
       "p",
@@ -763,16 +869,11 @@ async function loadBoardTopics(board, list, sort) {
         details.append(pinnedLabel);
       }
       details.append(title);
-      const voteCount = awardsByPost.get(`topic:${topic.id}`)?.vote_count || 0;
-      const rating = makeElement("span", "topic-vote-rating", `${voteCount} ${voteCount === 1 ? "vote" : "votes"}`);
-      rating.setAttribute("aria-label", `Rating: ${voteCount} ${voteCount === 1 ? "vote" : "votes"}`);
       const postAwards = awardsByPost.get(`topic:${topic.id}`);
-      const goldAwards = postAwards?.gold_awarded
-        ? { gold_awarded: true }
-        : null;
+      const rating = makeElement("span", "topic-vote-rating", formatPostRating(postAwards));
+      rating.setAttribute("aria-label", `Post rating: ${formatPostRating(postAwards)}`);
       const voteSummary = makeElement("span", "topic-vote-summary");
       voteSummary.append(rating);
-      appendPostAwardBadges(voteSummary, goldAwards);
       details.append(voteSummary);
       const replyCount = topic.replies?.[0]?.count || 0;
       const metadata = makeElement("p", "topic-meta");
@@ -841,7 +942,7 @@ function safeHttpsUrl(value) {
   }
 }
 
-function renderPost(profile, date, body, className, imageUrl = null, activity = null, moderationAction = null, medals = null, award = null, postType = null, postId = null, isFeatured = false) {
+function renderPost(profile, date, body, className, imageUrl = null, activity = null, moderationAction = null, memberRating = null, award = null, postType = null, postId = null, isFeatured = false) {
   const post = makeElement("article", `forum-post ${className}`);
   const author = profile?.username || "member";
   const authorPanel = makeElement("aside", "post-author");
@@ -850,7 +951,6 @@ function renderPost(profile, date, body, className, imageUrl = null, activity = 
     joinedDate.dateTime = activity.joined_at;
     authorPanel.append(joinedDate);
   }
-  appendMemberMedalStars(authorPanel, medals);
   const avatar = makeElement("div", "post-avatar", author.slice(0, 1).toUpperCase());
   const avatarUrl = safeHttpsUrl(profile?.avatar_url);
   if (avatarUrl) {
@@ -863,7 +963,7 @@ function renderPost(profile, date, body, className, imageUrl = null, activity = 
     avatar.append(image);
   }
   authorPanel.append(avatar, makeElement("strong", "post-author-name", author));
-  appendMemberLabels(authorPanel, profile?.id, null);
+  appendMemberLabels(authorPanel, profile?.id, memberRating);
 
   const profileLink = safeHttpsUrl(profile?.profile_link);
   if (profileLink) {
@@ -880,21 +980,32 @@ function renderPost(profile, date, body, className, imageUrl = null, activity = 
   const content = makeElement("div", "post-content");
   const header = makeElement("div", "post-header");
   header.append(makeElement("time", "", formatDate(date)));
-  if (award && postType && postId) {
+  if (award && postType === "topic" && postId) {
     const voteGroup = makeElement("span", "post-vote-group");
-    if (postType === "topic") {
-      appendPostAwardBadges(voteGroup, award);
+    const rating = makeElement("span", "post-score", formatPostRating(award));
+    rating.setAttribute("aria-label", `Post rating: ${formatPostRating(award)}`);
+    voteGroup.append(rating);
+    const isOwnPost = profile?.id === currentUser?.id;
+    const cannotRate = award.voted_by_user || isOwnPost;
+    voteGroup.append(makeElement("span", "post-rating-label", "Rate"));
+    for (const isPositive of [false, true]) {
+      const ratingValue = isPositive ? "1" : "0";
+      const label = isPositive ? "↑" : "↓";
+      const button = makeButton(
+        label,
+        `rate:${postType}:${postId}:${ratingValue}`,
+        `small-button post-rating-choice${award.user_vote === isPositive ? " selected" : ""}`
+      );
+      button.setAttribute("aria-label", isPositive ? "Rate this post positively" : "Rate this post negatively");
+      button.setAttribute("aria-pressed", String(award.user_vote === isPositive));
+      button.title = isPositive ? "Upvote this post" : "Downvote this post";
+      if (cannotRate) {
+        button.disabled = true;
+        if (isOwnPost) button.title = "You cannot rate your own post.";
+        else button.title = `You already ${award.user_vote ? "upvoted" : "downvoted"} this post.`;
+      }
+      voteGroup.append(button);
     }
-    const voteButton = makeButton(
-      award.voted_by_user ? `Voted · ${award.vote_count}` : `Vote · ${award.vote_count}`,
-      `vote:${postType}:${postId}`,
-      "small-button post-vote"
-    );
-    if (award.voted_by_user || profile?.id === currentUser?.id) {
-      voteButton.disabled = true;
-      if (profile?.id === currentUser?.id) voteButton.title = "You cannot vote on your own post.";
-    }
-    voteGroup.append(voteButton);
     header.append(voteGroup);
   }
   if (moderationAction && moderatorIds.has(currentUser?.id)) {
@@ -933,6 +1044,7 @@ function renderPost(profile, date, body, className, imageUrl = null, activity = 
 
 async function showTopic(id) {
   membersView.hidden = true;
+  notificationsView.hidden = true;
   topicView.hidden = false;
   boardView.hidden = true;
   composerView.hidden = true;
@@ -946,7 +1058,7 @@ async function showTopic(id) {
         .eq("id", id)
         .maybeSingle(),
       supabase.from("replies")
-        .select("id,body,created_at,profiles!replies_author_id_fkey(id,username,avatar_url,signature,profile_link)")
+        .select("id,body,parent_reply_id,created_at,profiles!replies_author_id_fkey(id,username,avatar_url,signature,profile_link)")
         .eq("topic_id", id)
         .order("created_at")
     ]);
@@ -956,12 +1068,10 @@ async function showTopic(id) {
 
     const profiles = [topic.profiles, ...replies.map(reply => reply.profiles)];
     const profileIds = profiles.map(profile => profile?.id);
-    const replyIds = replies.map(reply => reply.id);
-    const [activityByUser, medalsByUser, topicAwards, replyAwards] = await Promise.all([
+    const [activityByUser, ratingsByUser, topicAwards] = await Promise.all([
       loadMemberActivity(profileIds),
-      loadMemberMedals(profileIds),
-      loadPostAwards("topic", [topic.id]),
-      loadPostAwards("reply", replyIds)
+      loadMemberRatings(profileIds),
+      loadPostAwards("topic", [topic.id])
     ]);
     const board = boards.find(item => item.id === topic.board_id);
     const isDailyQuestion = board?.slug === dailyQuestionBoardSlug;
@@ -989,14 +1099,18 @@ async function showTopic(id) {
       topic.image_url,
       activityByUser.get(topic.profiles?.id),
       `moderate-delete-topic:${topic.id}`,
-      medalsByUser.get(topic.profiles?.id),
+      ratingsByUser.get(topic.profiles?.id),
       topicAwards.get(`topic:${topic.id}`),
       "topic",
       topic.id,
       topic.is_featured
     ));
+    const repliesById = new Map(replies.map(reply => [reply.id, reply]));
+    let replyTarget = null;
+    const replyTargetNotice = makeElement("div", "reply-target-notice");
+    let replyTextarea;
     for (const reply of replies) {
-      topicView.append(renderPost(
+      const replyPost = renderPost(
         reply.profiles,
         reply.created_at,
         reply.body,
@@ -1004,11 +1118,34 @@ async function showTopic(id) {
         null,
         activityByUser.get(reply.profiles?.id),
         `moderate-delete-reply:${reply.id}`,
-        medalsByUser.get(reply.profiles?.id),
-        replyAwards.get(`reply:${reply.id}`),
+        ratingsByUser.get(reply.profiles?.id),
+        null,
         "reply",
         reply.id
-      ));
+      );
+      const parentReply = repliesById.get(reply.parent_reply_id);
+      if (parentReply) {
+        const parentAuthor = parentReply.profiles?.username || "member";
+        const excerpt = parentReply.body.length > 140
+          ? `${parentReply.body.slice(0, 137)}…`
+          : parentReply.body;
+        const context = makeElement("p", "reply-parent-context", `Replying to ${parentAuthor}: ${excerpt}`);
+        replyPost.querySelector(".post-content").prepend(context);
+      }
+      if (currentUser && !isClosed) {
+        const replyButton = makeButton("Reply", "reply-to-reply", "small-button reply-to-button");
+        replyButton.addEventListener("click", () => {
+          replyTarget = reply;
+          replyTargetNotice.replaceChildren(
+            makeElement("span", "", `Replying to ${reply.profiles?.username || "member"}`),
+            makeButton("Cancel", "cancel-reply-target", "text-button")
+          );
+          replyTargetNotice.hidden = false;
+          replyTextarea.focus();
+        });
+        replyPost.querySelector(".post-header").append(replyButton);
+      }
+      topicView.append(replyPost);
     }
 
     if (isClosed) {
@@ -1018,12 +1155,23 @@ async function showTopic(id) {
         const { error } = await supabase.from("replies").insert({
           topic_id: topic.id,
           author_id: currentUser.id,
+          parent_reply_id: replyTarget?.id || null,
           body
         });
         if (error) throw error;
+        replyTarget = null;
         await refreshForum();
+        await refreshNotificationCount(currentUser.id);
         await showTopic(topic.id);
+      }, [replyTargetNotice]);
+      replyTargetNotice.hidden = true;
+      replyTargetNotice.addEventListener("click", event => {
+        if (event.target.closest('[data-action="cancel-reply-target"]')) {
+          replyTarget = null;
+          replyTargetNotice.hidden = true;
+        }
       });
+      replyTextarea = replyForm.querySelector('textarea[name="body"]');
       topicView.append(replyForm);
     } else {
       const prompt = makeElement("p", "empty-state", "Sign in to reply to this conversation.");
@@ -1140,6 +1288,7 @@ function makePostForm(heading, submitLabel, onSubmit, leadingFields = [], includ
 
 function showComposer(slug) {
   membersView.hidden = true;
+  notificationsView.hidden = true;
   const board = boards.find(item => item.slug === slug);
   if (!board) {
     setForumMessage("That board could not be found.", true);
@@ -1245,12 +1394,15 @@ function handleRoute() {
     showComposer(slug);
   } else if (isMembersPage) {
     showMembers(route.startsWith("members/") ? route.slice("members/".length) : 1);
+  } else if (route === "notifications") {
+    showNotifications();
   } else {
     indexPanel.hidden = false;
     boardView.hidden = true;
     topicView.hidden = true;
     composerView.hidden = true;
     membersView.hidden = true;
+    notificationsView.hidden = true;
   }
 }
 
@@ -1456,6 +1608,19 @@ async function moderateDeleteReply(replyId) {
   await showTopic(reply.topic_id);
 }
 
+async function markNotificationRead(notificationId) {
+  try {
+    const { error } = await supabase.rpc("mark_reply_notification_read", {
+      p_notification_id: notificationId
+    });
+    if (error) throw error;
+    await showNotifications();
+  } catch (error) {
+    console.error("Could not mark notification as read:", error);
+    setForumMessage(`Could not mark notification as read: ${error.message}`, true);
+  }
+}
+
 async function runModerationAction(action) {
   try {
     if (action.startsWith("moderate-delete-topic:")) {
@@ -1491,16 +1656,17 @@ async function runModerationAction(action) {
   }
 }
 
-async function runVoteAction(action) {
+async function runRatingAction(action) {
   if (!currentUser) {
     openAuth("login");
     return;
   }
 
-  const [, postType, postId] = action.split(":");
+  const [, postType, postId, positiveValue] = action.split(":");
   const parameters = {
     p_topic_id: postType === "topic" ? postId : null,
-    p_reply_id: postType === "reply" ? postId : null
+    p_reply_id: postType === "reply" ? postId : null,
+    p_is_positive: positiveValue === "1"
   };
   try {
     const { error } = await supabase.rpc("cast_post_vote", parameters);
@@ -1508,8 +1674,8 @@ async function runVoteAction(action) {
     const route = decodeURIComponent(window.location.hash.slice(1));
     if (route.startsWith("topic/")) await showTopic(route.slice("topic/".length));
   } catch (error) {
-    console.error("Could not cast post vote:", error);
-    setForumMessage(`Could not cast vote: ${error.message}`, true);
+    console.error("Could not submit post rating:", error);
+    setForumMessage(`Could not submit rating: ${error.message}`, true);
   }
 }
 
@@ -1526,7 +1692,11 @@ document.addEventListener("click", event => {
   const actionButton = event.target.closest("[data-action]");
   if (!actionButton) return;
   const action = actionButton.dataset.action;
-  if (action === "make-post") {
+  if (action === "notifications") {
+    window.location.hash = "notifications";
+  } else if (action.startsWith("mark-notification:")) {
+    void markNotificationRead(action.slice("mark-notification:".length));
+  } else if (action === "make-post") {
     if (!supabase) {
       setForumMessage("Forum setup is not finished. Add the Supabase project details first.", true);
       return;
@@ -1538,8 +1708,8 @@ document.addEventListener("click", event => {
     }
   } else if (action.startsWith("moderate-delete-") || action.startsWith("moderate-pin-topic:") || action.startsWith("moderate-feature-topic:")) {
     void runModerationAction(action);
-  } else if (action.startsWith("vote:")) {
-    void runVoteAction(action);
+  } else if (action.startsWith("rate:")) {
+    void runRatingAction(action);
   } else if (action === "auth-signup" || action === "auth-login") {
     if (!supabase) {
       setForumMessage("Forum setup is not finished. Add the Supabase project details first.", true);
@@ -1632,6 +1802,9 @@ authForm.addEventListener("submit", async event => {
 });
 
 window.addEventListener("hashchange", handleRoute);
+window.setInterval(() => {
+  if (currentUser) void refreshNotificationCount(currentUser.id);
+}, 60 * 1000);
 
 if (!supabaseUrl || !supabaseAnonKey) {
   boardList.replaceChildren();
