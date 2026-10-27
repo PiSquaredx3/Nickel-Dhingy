@@ -299,12 +299,14 @@ create table if not exists public.replies (
   author_id uuid not null constraint replies_author_id_fkey references public.profiles (id) on delete cascade,
   parent_reply_id uuid references public.replies (id) on delete set null,
   body text not null,
+  image_url text,
   created_at timestamptz not null default now(),
   constraint replies_body_length check (char_length(btrim(body)) between 1 and 10000)
 );
 
 alter table public.replies
-  add column if not exists parent_reply_id uuid references public.replies (id) on delete set null;
+  add column if not exists parent_reply_id uuid references public.replies (id) on delete set null,
+  add column if not exists image_url text;
 
 create index if not exists topics_board_updated_at on public.topics (board_id, updated_at desc);
 create index if not exists topics_board_pinned_updated_at

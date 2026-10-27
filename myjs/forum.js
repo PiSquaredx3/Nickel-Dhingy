@@ -1090,7 +1090,7 @@ async function showTopic(id) {
         .eq("id", id)
         .maybeSingle(),
       supabase.from("replies")
-        .select("id,body,parent_reply_id,created_at,profiles!replies_author_id_fkey(id,username,avatar_url,signature,profile_link)")
+        .select("id,body,image_url,parent_reply_id,created_at,profiles!replies_author_id_fkey(id,username,avatar_url,signature,profile_link)")
         .eq("topic_id", id)
         .order("created_at")
     ]);
@@ -1147,7 +1147,7 @@ async function showTopic(id) {
         reply.created_at,
         reply.body,
         "topic-reply",
-        null,
+        reply.image_url,
         activityByUser.get(reply.profiles?.id),
         `moderate-delete-reply:${reply.id}`,
         ratingsByUser.get(reply.profiles?.id),
@@ -1183,19 +1183,43 @@ async function showTopic(id) {
     if (isClosed) {
       topicView.append(makeElement("p", "empty-state", "This conversation is read-only."));
     } else if (currentUser) {
-      const replyForm = makePostForm("Write a reply", "Post reply", async body => {
+      const replyForm = makePostForm("Write a reply", "Post reply", async (body, imageFile) => {
+        let imagePath = null;
+        let imageUrl = null;
+        if (imageFile) {
+          imagePath = `${currentUser.id}/${crypto.randomUUID()}`;
+          const { error: uploadError } = await supabase.storage
+            .from("topic-images")
+            .upload(imagePath, imageFile, {
+              cacheControl: "3600",
+              contentType: imageFile.type,
+              upsert: false
+            });
+          if (uploadError) throw uploadError;
+          imageUrl = supabase.storage.from("topic-images").getPublicUrl(imagePath).data.publicUrl;
+        }
+
         const { error } = await supabase.from("replies").insert({
           topic_id: topic.id,
           author_id: currentUser.id,
           parent_reply_id: replyTarget?.id || null,
-          body
+          body,
+          image_url: imageUrl
         });
-        if (error) throw error;
+        if (error) {
+          if (imagePath) {
+            const { error: cleanupError } = await supabase.storage.from("topic-images").remove([imagePath]);
+            if (cleanupError) {
+              throw new Error(`Could not post reply: ${error.message}. The uploaded image could not be removed: ${cleanupError.message}`);
+            }
+          }
+          throw error;
+        }
         replyTarget = null;
         await refreshForum();
         await refreshNotificationCount(currentUser.id);
         await showTopic(topic.id);
-      }, [replyTargetNotice]);
+      }, [replyTargetNotice], true);
       replyTargetNotice.hidden = true;
       replyTargetNotice.addEventListener("click", event => {
         if (event.target.closest('[data-action="cancel-reply-target"]')) {
@@ -1595,6 +1619,11 @@ async function moderateDeleteTopic(topicId) {
   if (topicError) throw topicError;
   if (!topic) throw new Error("This topic no longer exists.");
 
+  const { data: replies, error: repliesError } = await supabase.from("replies")
+    .select("image_url")
+    .eq("topic_id", topicId);
+  if (repliesError) throw repliesError;
+
   const { data: deleted, error } = await supabase.from("topics")
     .delete()
     .eq("id", topicId)
@@ -1603,10 +1632,12 @@ async function moderateDeleteTopic(topicId) {
   if (error) throw error;
   if (!deleted) throw new Error("The topic could not be deleted. Check moderator access.");
 
-  let cleanupError;
-  const imagePath = getTopicImagePath(topic.image_url);
-  if (imagePath) {
-    const result = await supabase.storage.from("topic-images").remove([imagePath]);
+  const imagePaths = [topic.image_url, ...replies.map(reply => reply.image_url)]
+    .map(getTopicImagePath)
+    .filter(Boolean);
+  let cleanupError = null;
+  if (imagePaths.length) {
+    const result = await supabase.storage.from("topic-images").remove(imagePaths);
     cleanupError = result.error;
   }
 
@@ -1614,7 +1645,7 @@ async function moderateDeleteTopic(topicId) {
   const board = boards.find(item => item.id === topic.board_id);
   window.location.hash = board ? `board/${encodeURIComponent(board.slug)}` : "forums";
   if (cleanupError) {
-    setForumMessage(`The topic was deleted, but its image could not be removed: ${cleanupError.message}`, true);
+    setForumMessage(`The topic was deleted, but one or more attached images could not be removed: ${cleanupError.message}`, true);
   }
 }
 
@@ -1623,7 +1654,7 @@ async function moderateDeleteReply(replyId) {
   if (!window.confirm("Delete this reply? This cannot be undone.")) return;
 
   const { data: reply, error: replyError } = await supabase.from("replies")
-    .select("topic_id")
+    .select("topic_id,image_url")
     .eq("id", replyId)
     .maybeSingle();
   if (replyError) throw replyError;
@@ -1636,8 +1667,17 @@ async function moderateDeleteReply(replyId) {
     .maybeSingle();
   if (error) throw error;
   if (!deleted) throw new Error("The reply could not be deleted. Check moderator access.");
+  const imagePath = getTopicImagePath(reply.image_url);
+  let cleanupError = null;
+  if (imagePath) {
+    const result = await supabase.storage.from("topic-images").remove([imagePath]);
+    cleanupError = result.error;
+  }
   await refreshForum();
   await showTopic(reply.topic_id);
+  if (cleanupError) {
+    setForumMessage(`The reply was deleted, but its image could not be removed: ${cleanupError.message}`, true);
+  }
 }
 
 async function markNotificationRead(notificationId) {
