@@ -22,8 +22,6 @@ const authPassword = authForm.elements.password;
 const authForgot = document.querySelector("#auth-forgot");
 const authSwitch = document.querySelector("#auth-switch");
 const siteTitle = document.querySelector(".site-title");
-const profileBadgeStatus = document.querySelector("#profile-badge-status");
-const profileBadgeDisplay = document.querySelector("#profile-badge-display");
 const forumNewsHeadline = document.querySelector("#forum-news-headline");
 const forumNewsBody = document.querySelector("#forum-news-body");
 const forumNewsMessage = document.querySelector("#forum-news-message");
@@ -53,7 +51,6 @@ let currentUser;
 let boards = [];
 let moderatorIds = new Set();
 let boardModeratorBoardIds = new Map();
-let profileBadgeRequest = 0;
 let membersRequest = 0;
 let boardTopicsRequest = 0;
 let notificationsRequest = 0;
@@ -185,67 +182,6 @@ async function loadForumNews() {
   renderForumNews(data);
 }
 
-async function loadMemberActivity(userIds) {
-  const ids = [...new Set(userIds.filter(Boolean))];
-  if (!ids.length) return new Map();
-  const { data, error } = await supabase.from("member_activity")
-    .select("user_id,joined_at,post_count,active_days,current_streak,longest_streak,badge_tier,ghosted_badge,account_years")
-    .in("user_id", ids);
-  if (error) throw error;
-  return new Map(data.map(activity => [activity.user_id, activity]));
-}
-
-async function updateProfileBadge(user) {
-  const request = ++profileBadgeRequest;
-  if (!user) {
-    profileBadgeDisplay.replaceChildren();
-    profileBadgeDisplay.hidden = true;
-    profileBadgeStatus.hidden = false;
-    profileBadgeStatus.textContent = "Sign in to collect profile badges.";
-    return;
-  }
-
-  profileBadgeDisplay.replaceChildren();
-  profileBadgeDisplay.hidden = true;
-  profileBadgeStatus.hidden = false;
-  profileBadgeStatus.textContent = "Loading your profile badges…";
-
-  try {
-    const activityByUser = await loadMemberActivity([user.id]);
-    if (request !== profileBadgeRequest || currentUser?.id !== user.id) return;
-    const activity = activityByUser.get(user.id) || {};
-    profileBadgeStatus.hidden = true;
-    profileBadgeDisplay.hidden = false;
-    profileBadgeDisplay.classList.add("profile-badge-collection");
-
-    const longest = activity.longest_streak || 0;
-    const streakTiers = [
-      { key: "bronze", level: 3, name: "Returning Member", flavor: "Back again, keeping the fires warm." },
-      { key: "silver", level: 7, name: "Committed Member", flavor: "Seven returns—this corner knows your name." },
-      { key: "gold", level: 30, name: "Forum Veteran", flavor: "A month of returns has made a legend." }
-    ];
-    for (const tier of streakTiers) {
-      const unlocked = longest >= tier.level;
-      profileBadgeDisplay.append(makeBadgeCard(
-        makeStreakTierBadge(tier, unlocked, longest),
-        unlocked ? "Unlocked" : "Locked",
-        getStreakProgress(activity, tier.level),
-        tier.flavor
-      ));
-    }
-
-    profileBadgeDisplay.append(makeBadgeCard(makeGhostBadge(activity.ghosted_badge), activity.ghosted_badge ? "Unlocked" : "Locked", activity.ghosted_badge
-      ? "A post waited three silent days."
-      : "Have a post receive no replies for 3 days.", "A post whispered into the void and stayed unanswered."));
-
-    profileBadgeDisplay.append(makeBadgeCard(makeAnniversaryBadge(activity.account_years || 0), activity.account_years >= 1 ? "Unlocked" : "Locked", getAnniversaryProgress(activity.account_years || 0), getAnniversaryFlavor(activity.account_years || 0)));
-  } catch (error) {
-    if (request !== profileBadgeRequest || currentUser?.id !== user.id) return;
-    console.error("Could not load your profile badges:", error);
-    profileBadgeStatus.textContent = `Could not load your profile badges: ${error.message}`;
-  }
-}
-
 async function loadPostAwards(postType, postIds) {
   if (!postIds.length) return new Map();
   const { data, error } = await supabase.from("post_awards")
@@ -262,112 +198,12 @@ function formatPostRating(award) {
   return `${Number(award.post_rating).toFixed(2)} / 1.00 · ${ratingCount} ${ratingCount === 1 ? "rating" : "ratings"}`;
 }
 
-function getStreakProgress(activity, required = null) {
-  const longest = activity?.longest_streak || 0;
-  if (required) return longest >= required ? `${required}-day streak achieved` : `${longest}/${required} consecutive days`;
-  if (longest >= 30) return "30-day streak achieved";
-  if (longest >= 7) return `${longest}/30 days to Forum Veteran`;
-  if (longest >= 3) return `${longest}/7 days to Committed Member`;
-  return `${longest}/3 days to Returning Member`;
-}
-
-function getAnniversaryProgress(years) {
-  if (years < 1) return "Unlocks after 1 year on the forum";
-  return `Year ${years} complete · Year ${years + 1} is next`;
-}
-
-function makeStreakTierBadge(tier, unlocked, longest) {
-  const className = tier.key === "gold" ? "profile-badge-gold" : tier.key === "silver" ? "profile-badge-silver" : "profile-badge-bronze";
-  const badge = makeElement("span", `profile-badge ${className}${unlocked ? "" : " profile-badge-locked"}`);
-  badge.setAttribute("role", "img");
-  badge.title = `${tier.name} · ${tier.flavor}${unlocked ? ` ${longest}-day longest streak` : " Locked"}`;
-  badge.setAttribute("aria-label", badge.title);
-  badge.append(makeElement("span", "profile-badge-duration", `${tier.level}-Day`));
-  badge.append(makeElement("span", "profile-badge-name", tier.name));
-  return badge;
-}
-
-function makeProfileBadge(activity, unusedType, fullActivity = activity) {
-  const tiers = {
-    bronze: { level: "3-Day", name: "Returning Member", flavor: "Back again, keeping the fires warm.", className: "profile-badge-bronze" },
-    silver: { level: "7-Day", name: "Committed Member", flavor: "Seven returns—this corner knows your name.", className: "profile-badge-silver" },
-    gold: { level: "30-Day", name: "Forum Veteran", flavor: "A month of returns has made a legend.", className: "profile-badge-gold" }
-  };
-  const tier = tiers[activity.badge_tier] || null;
-  const badge = makeElement("span", `profile-badge profile-badge-locked ${tier?.className || "profile-badge-bronze"}`);
-  if (tier) badge.classList.remove("profile-badge-locked");
-  badge.setAttribute("role", "img");
-  const longest = fullActivity?.longest_streak || 0;
-  if (tier) {
-    badge.title = `${tier.name} · ${tier.flavor} ${longest}-day longest streak`;
-    badge.setAttribute("aria-label", badge.title);
-    badge.append(makeElement("span", "profile-badge-duration", tier.level));
-    badge.append(makeElement("span", "profile-badge-name", tier.name));
-  } else {
-    badge.title = "Returning Member · Locked · Back again, keeping the fires warm.";
-    badge.setAttribute("aria-label", badge.title);
-    badge.append(makeElement("span", "profile-badge-duration", "3-Day"));
-    badge.append(makeElement("span", "profile-badge-name", "Returning Member"));
-  }
-  return badge;
-}
-
-function makeGhostBadge(unlocked) {
-  const badge = makeElement("span", `profile-badge profile-badge-special${unlocked ? "" : " profile-badge-locked"}`);
-  badge.setAttribute("role", "img");
-  badge.title = "The Long Silence · A post waited three silent days without a reply.";
-  badge.setAttribute("aria-label", unlocked ? `${badge.title} Unlocked` : `${badge.title} Locked`);
-  badge.append(makeElement("span", "profile-badge-duration", "3 Days"));
-  badge.append(makeElement("span", "profile-badge-name", "The Long Silence"));
-  return badge;
-}
-
-function makeAnniversaryBadge(years) {
-  const unlocked = years >= 1;
-  const level = unlocked ? `Year ${years}` : "Year 1";
-  const name = unlocked ? (years >= 5 ? "Forum Relic" : years >= 3 ? "Old Hand" : "Yearly Witness") : "Yearly Witness";
-  const flavor = unlocked
-    ? `${years} ${years === 1 ? "year" : "years"} survived, one more chapter in the forum archives.`
-    : "Unlocks when your account completes its first year.";
-  const className = years >= 5 ? "profile-badge-gold" : years >= 3 ? "profile-badge-silver" : "profile-badge-bronze";
-  const badge = makeElement("span", `profile-badge ${className}${unlocked ? "" : " profile-badge-locked"}`);
-  badge.setAttribute("role", "img");
-  badge.title = `${name} · ${flavor}`;
-  badge.setAttribute("aria-label", badge.title);
-  badge.append(makeElement("span", "profile-badge-duration", level));
-  badge.append(makeElement("span", "profile-badge-name", name));
-  return badge;
-}
-
-function getAnniversaryFlavor(years) {
-  if (!years) return "Unlocks when your account completes its first year.";
-  return `${years} ${years === 1 ? "year" : "years"} survived, one more chapter in the forum archives.`;
-}
-
-function makeBadgeCard(badge, status, progress, flavor = "") {
-  const card = makeElement("div", "profile-badge-card");
-  const meta = makeElement("div", "profile-badge-card-meta");
-  meta.append(makeElement("span", `profile-badge-status-tag ${status.toLowerCase()}`, status));
-  meta.append(makeElement("span", "profile-badge-progress", progress));
-  card.append(badge, meta);
-  if (flavor) card.append(makeElement("p", "profile-badge-flavor", flavor));
-  return card;
-}
-
 function appendMemberLabels(container, userId, activity, boardId = null) {
   const labels = makeElement("span", "member-labels");
   let hasLabels = false;
   if (moderatorIds.has(userId) || (boardId !== null && canModerateBoard(userId, boardId))) {
     labels.append(makeModeratorBadge());
     hasLabels = true;
-  }
-
-  if (activity?.badge_tier) {
-    const badge = makeProfileBadge(activity);
-    if (badge) {
-      labels.append(badge);
-      hasLabels = true;
-    }
   }
 
   if (hasLabels) container.append(labels);
@@ -393,7 +229,6 @@ function updateAccount(user) {
   forumNewsEditButton.hidden = !user || !moderatorIds.has(user.id);
   if (forumNewsEditButton.hidden) forumNewsEditor.hidden = true;
   if (previousUserId !== user?.id) notificationsRequest++;
-  void updateProfileBadge(user);
   const links = document.querySelector("#account-links");
   links.replaceChildren();
 
@@ -722,8 +557,6 @@ async function showMembers(pageNumber = 1) {
       return;
     }
 
-    const activityByUser = await loadMemberActivity(data.map(member => member.id));
-    if (request !== membersRequest) return;
     const list = makeElement("ol", "member-list");
     list.start = start + 1;
     if (!data.length) {
@@ -737,7 +570,7 @@ async function showMembers(pageNumber = 1) {
       const joinedDate = makeElement("time", "member-list-date", `Joined ${formatDateOnly(member.created_at)}`);
       joinedDate.dateTime = member.created_at;
       memberIdentity.append(memberName);
-      appendMemberLabels(memberIdentity, member.id, activityByUser.get(member.id));
+      appendMemberLabels(memberIdentity, member.id, null);
       item.append(memberNumber, memberIdentity, joinedDate);
       list.append(item);
     }
@@ -1174,11 +1007,7 @@ async function showTopic(id) {
     if (!topic) throw new Error("This topic no longer exists.");
 
     const profiles = [topic.profiles, ...replies.map(reply => reply.profiles)];
-    const profileIds = profiles.map(profile => profile?.id);
-    const [activityByUser, topicAwards] = await Promise.all([
-      loadMemberActivity(profileIds),
-      loadPostAwards("topic", [topic.id])
-    ]);
+    const topicAwards = await loadPostAwards("topic", [topic.id]);
     const board = boards.find(item => item.id === topic.board_id);
     if (window.location.hash === `#topic/${id}`) {
       document.body.classList.toggle("rathner-board-theme", board?.slug === "rathner");

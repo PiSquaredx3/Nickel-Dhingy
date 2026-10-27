@@ -152,7 +152,6 @@ revoke all on function public.can_moderate_board(bigint) from public, anon, auth
 grant execute on function public.can_moderate_board(bigint) to authenticated;
 
 alter table public.boards
-  drop column if exists icon,
   add column if not exists description text not null default '';
 
 create table if not exists public.forum_news (
@@ -549,76 +548,7 @@ $$;
 revoke all on function public.set_topic_featured(uuid, boolean) from public, anon, authenticated;
 grant execute on function public.set_topic_featured(uuid, boolean) to authenticated;
 
-create or replace view public.member_activity as
-with contributions as (
-  select author_id, created_at from public.topics
-  union all
-  select author_id, created_at from public.replies
-),
-daily_activity as (
-  select distinct author_id as user_id, created_at::date as activity_date
-  from contributions
-),
-numbered_days as (
-  select
-    user_id,
-    activity_date,
-    activity_date - row_number() over (partition by user_id order by activity_date)::integer as streak_group
-  from daily_activity
-),
-streak_lengths as (
-  select user_id, streak_group, count(*)::integer as streak_length
-  from numbered_days
-  group by user_id, streak_group
-),
-latest_activity as (
-  select user_id, max(activity_date) as activity_date
-  from daily_activity
-  group by user_id
-),
-current_streaks as (
-  select s.user_id, s.streak_length::integer as current_streak
-  from streak_lengths s
-  join numbered_days d on d.user_id = s.user_id and d.streak_group = s.streak_group
-  join latest_activity l on l.user_id = d.user_id and l.activity_date = d.activity_date
-  where l.activity_date >= current_date - 1
-),
-streak_summaries as (
-  select user_id, max(streak_length)::integer as longest_streak
-  from streak_lengths
-  group by user_id
-)
-select
-  p.id as user_id,
-  p.created_at as joined_at,
-  count(c.created_at)::integer as post_count,
-  count(distinct c.created_at::date)::integer as active_days,
-  coalesce(cs.current_streak, 0)::integer as current_streak,
-  coalesce(ss.longest_streak, 0)::integer as longest_streak,
-  exists (
-    select 1
-    from public.topics ghost_topic
-    where ghost_topic.author_id = p.id
-      and ghost_topic.created_at <= now() - interval '3 days'
-      and not exists (
-        select 1 from public.replies ghost_reply
-        where ghost_reply.topic_id = ghost_topic.id
-      )
-  ) as ghosted_badge,
-  floor(extract(epoch from age(now(), p.created_at)) / (365.25 * 24 * 60 * 60))::integer as account_years,
-  case
-    when coalesce(ss.longest_streak, 0) >= 30 then 'gold'
-    when coalesce(ss.longest_streak, 0) >= 7 then 'silver'
-    when coalesce(ss.longest_streak, 0) >= 3 then 'bronze'
-    else null
-  end::text as badge_tier
-from public.profiles p
-left join contributions c on c.author_id = p.id
-left join streak_summaries ss on ss.user_id = p.id
-left join current_streaks cs on cs.user_id = p.id
-group by p.id, p.created_at, cs.current_streak, ss.longest_streak;
-
-grant select on public.member_activity to anon, authenticated;
+drop view if exists public.member_activity;
 
 create table if not exists public.post_votes (
   id uuid primary key default gen_random_uuid(),
