@@ -1006,7 +1006,6 @@ async function showTopic(id) {
     if (replyError) throw replyError;
     if (!topic) throw new Error("This topic no longer exists.");
 
-    const profiles = [topic.profiles, ...replies.map(reply => reply.profiles)];
     const topicAwards = await loadPostAwards("topic", [topic.id]);
     const board = boards.find(item => item.id === topic.board_id);
     if (window.location.hash === `#topic/${id}`) {
@@ -1035,7 +1034,7 @@ async function showTopic(id) {
       topic.body,
       "topic-first-post",
       topic.image_url,
-      activityByUser.get(topic.profiles?.id),
+      null,
       `moderate-delete-topic:${topic.id}`,
       null,
       topicAwards.get(`topic:${topic.id}`),
@@ -1055,7 +1054,7 @@ async function showTopic(id) {
         reply.body,
         "topic-reply",
         reply.image_url,
-        activityByUser.get(reply.profiles?.id),
+        null,
         `moderate-delete-reply:${reply.id}`,
         null,
         null,
