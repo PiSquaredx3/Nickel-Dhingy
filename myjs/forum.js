@@ -1124,6 +1124,9 @@ async function showTopic(id) {
       loadPostAwards("topic", [topic.id])
     ]);
     const board = boards.find(item => item.id === topic.board_id);
+    if (window.location.hash === `#topic/${id}`) {
+      document.body.classList.toggle("rathner-board-theme", board?.slug === "rathner");
+    }
     const isDailyQuestion = board?.slug === dailyQuestionBoardSlug;
     const closesAt = isDailyQuestion
       ? new Date(new Date(topic.created_at).getTime() + dailyQuestionDurationMs)
