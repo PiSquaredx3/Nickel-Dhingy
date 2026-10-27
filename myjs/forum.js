@@ -88,7 +88,7 @@ const emojiNames = [
   "new_russian", "ok", "on_the_quiet", "on_the_quiet2", "paint2", "paint3", "paratrooper",
   "paratrooper_girl", "pardon", "parting", "party", "party2", "pilot", "pioneer", "pioneer_smoke",
   "pleasantry", "popcorm1", "popcorm2", "prankster2", "preved", "punish", "read", "rofl",
-  "russian_ru", "sad", "sarcasm", "sarcastic", "sarcastic_blum", "sarcastic_hand", "scare", "scaut",
+  "sad", "sarcasm", "sarcastic", "sarcastic_blum", "sarcastic_hand", "scare",
   "scaut_en", "scratch_one-s_head", "search", "secret", "sensored", "shok", "shout", "slow", "smile",
   "smoke", "soldier", "soldier_girl", "sorry", "sorry2", "spruce_up", "stinker", "sun_bespectacled",
   "superman", "superstition", "swoon", "tease", "tender", "thank_you2", "this", "to_babruysk",
