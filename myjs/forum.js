@@ -71,6 +71,7 @@ const siteTitles = [
 
 const allowedImageTypes = ["image/jpeg", "image/gif", "image/webp", "image/png"];
 const maxImageSize = 2 * 1024 * 1024;
+const defaultAvatarUrl = "assets/default.png";
 const emojiNames = [
   "acute", "aggressive", "air_kiss", "angel", "bad", "bb", "beach", "beee", "big_boss", "biggrin",
   "blum3", "blush", "boast", "bomb", "boredom", "buba", "buba_phone", "bye", "clapping", "cray",
@@ -328,6 +329,11 @@ function updateAccount(user) {
     const profileButton = makeButton("", "profile-edit", "text-button account-name");
     profileButton.setAttribute("aria-label", `Edit profile for ${username}`);
     const avatar = makeElement("span", "account-avatar", username.slice(0, 1).toUpperCase());
+    const avatarImage = document.createElement("img");
+    avatarImage.alt = "";
+    avatarImage.loading = "lazy";
+    setAvatarImage(avatarImage);
+    avatar.append(avatarImage);
     profileButton.append(avatar, makeElement("span", "", username));
     if (moderatorIds.has(user.id)) {
       const moderatorBadge = makeModeratorBadge();
@@ -345,7 +351,7 @@ function updateAccount(user) {
     notificationControl.append(notificationsButton, notificationCount);
     links.append(notificationControl);
     links.append(makeButton("Log out", "logout", "text-button"));
-    void loadAccountAvatar(user.id, avatar);
+    void loadAccountAvatar(user.id, avatarImage);
     void refreshNotificationCount(user.id);
   } else {
     links.append(makeButton("Sign up", "auth-signup", "text-button"));
@@ -377,24 +383,29 @@ async function refreshNotificationCount(userId) {
   }
 }
 
-async function loadAccountAvatar(userId, avatar) {
+function setAvatarImage(image, avatarUrl = null) {
+  const fallbackUrl = new URL(defaultAvatarUrl, document.baseURI).href;
+  image.src = avatarUrl || fallbackUrl;
+  if (avatarUrl) {
+    image.addEventListener("error", () => {
+      image.src = fallbackUrl;
+    }, { once: true });
+  }
+}
+
+async function loadAccountAvatar(userId, avatarImage) {
   try {
     const { data, error } = await supabase.from("profiles")
       .select("avatar_url")
       .eq("id", userId)
       .single();
     if (error) throw error;
-    if (currentUser?.id !== userId || !avatar.isConnected) return;
+    if (currentUser?.id !== userId || !avatarImage.isConnected) return;
     const avatarUrl = safeHttpsUrl(data.avatar_url);
-    if (!avatarUrl) return;
-
-    const image = document.createElement("img");
-    image.src = avatarUrl;
-    image.alt = "";
-    image.loading = "lazy";
-    image.referrerPolicy = "no-referrer";
-    image.addEventListener("error", () => image.remove(), { once: true });
-    avatar.append(image);
+    if (avatarUrl) {
+      avatarImage.referrerPolicy = "no-referrer";
+      setAvatarImage(avatarImage, avatarUrl);
+    }
   } catch (error) {
     console.error("Could not load account profile picture:", error);
     setForumMessage(`Could not load account profile picture: ${error.message}`, true);
@@ -975,15 +986,14 @@ function renderPost(profile, date, body, className, imageUrl = null, activity = 
   }
   const avatar = makeElement("div", "post-avatar", author.slice(0, 1).toUpperCase());
   const avatarUrl = safeHttpsUrl(profile?.avatar_url);
+  const avatarImage = document.createElement("img");
+  avatarImage.alt = `${author}'s profile picture`;
+  avatarImage.loading = "lazy";
+  setAvatarImage(avatarImage, avatarUrl);
   if (avatarUrl) {
-    const image = document.createElement("img");
-    image.src = avatarUrl;
-    image.alt = `${author}'s profile picture`;
-    image.loading = "lazy";
-    image.referrerPolicy = "no-referrer";
-    image.addEventListener("error", () => image.remove(), { once: true });
-    avatar.append(image);
+    avatarImage.referrerPolicy = "no-referrer";
   }
+  avatar.append(avatarImage);
   authorPanel.append(avatar, makeElement("strong", "post-author-name", author));
   appendMemberLabels(authorPanel, profile?.id, memberRating);
 

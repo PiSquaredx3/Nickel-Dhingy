@@ -820,17 +820,18 @@ where slug in (
 
 insert into public.boards (slug, title, description, category, position)
 values
-  ('general', 'Any&All', 'General conversation, questions, and topics that do not fit another board.', 'BOARDS', 1),
-  ('clips-images', 'Any&All Clips & Images', 'Share screenshots, clips, photos, and other images.', 'BOARDS', 2),
-  ('art', 'Any&All Art', 'Any&All Art Discussions', 'BOARDS', 3),
-  ('games-recommendations', 'Any&All Games', 'Talk about games, ask for recommendations, and share what you are playing.', 'BOARDS', 4),
-  ('anime', 'Any&All Anime', 'Discuss anime, manga, characters, and recommendations; use spoiler warnings as needed.', 'EVEN MORE BOARDS', 5),
-  ('movies-tv', 'Any&All Movies & TV', 'Talk about films and television, share recommendations; use spoiler warnings as needed.', 'EVEN MORE BOARDS', 6),
-  ('music-discussion', 'Any&All Music Discussion', 'Share music, artists, albums, and playlists, and talk about what you are listening to.', 'EVEN MORE BOARDS', 7),
-  ('hobbies-projects', 'Any&All Hobbies & Projects', 'Show what you are making or learning, ask for advice, and share progress updates.', 'EVEN MORE BOARDS', 8),
-  ('lolwhat', 'lolwhat', 'cesspool', 'EVEN MORE BOARDS', 9),
-  ('books-comics', 'Any&All Writing', 'Discuss books, comics, and what you are reading; use spoiler warnings as needed.', 'EVEN MORE BOARDS', 10),
-  ('question-of-the-day', 'Question of the Day Archive', 'Archive of the daily questions.', 'DAILY QUESTION', 11)
+  ('general', 'Any&All', 'if you dont know where to post, then uh post here', 'BOARDS', 1),
+  ('clips-images', 'Any&All Clips & Images', 'mom, mom get the camera', 'BOARDS', 2),
+  ('art', 'Any&All Art', 'i suck at drawing', 'BOARDS', 3),
+  ('games-recommendations', 'Any&All Games', 'Toxic Positivity.', 'BOARDS', 4),
+  ('anime', 'Any&All Anime', 'I am NOT watching all 1000+ episodes of One piece; use spoiler warnings as needed.', 'EVEN MORE BOARDS', 5),
+  ('movies-tv', 'Any&All Movies & TV', 'real telivision only. like Bubble Guppies or Pete the Cat', 'EVEN MORE BOARDS', 6),
+  ('music-discussion', 'Any&All Music Discussion', 'Your niche indie artist sucks cuh', 'EVEN MORE BOARDS', 7),
+  ('hobbies-projects', 'Any&All Hobbies & Projects', '"Look at my cool shit"', 'EVEN MORE BOARDS', 8),
+  ('tech', 'Any&All Tech', 'I require STP.', 'EVEN MORE BOARDS', 9),
+  ('books-comics', 'Any&All Writing', '1984, ferinheight 451, the other greats; use spoiler warnings as needed.', 'EVEN MORE BOARDS', 10),
+  ('lolwhat', 'lolwhat', 'cesspool', 'EVEN MORE BOARDS', 11),
+  ('question-of-the-day', 'Question of the Day Archive', 'Archive of the daily questions.', 'DAILY QUESTION', 12)
 on conflict (slug) do update set
   title = excluded.title,
   description = excluded.description,
