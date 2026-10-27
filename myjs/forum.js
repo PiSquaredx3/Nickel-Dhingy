@@ -52,6 +52,7 @@ let supabase;
 let currentUser;
 let boards = [];
 let moderatorIds = new Set();
+let boardModeratorBoardIds = new Map();
 let ratingBadgeRequest = 0;
 let membersRequest = 0;
 let boardTopicsRequest = 0;
@@ -151,9 +152,23 @@ function isReservedUsername(username) {
 }
 
 async function loadModerators() {
-  const { data, error } = await supabase.from("moderators").select("user_id");
-  if (error) throw error;
-  moderatorIds = new Set(data.map(moderator => moderator.user_id));
+  const [globalResult, boardResult] = await Promise.all([
+    supabase.from("moderators").select("user_id"),
+    supabase.from("board_moderators").select("user_id,board_id")
+  ]);
+  if (globalResult.error) throw globalResult.error;
+  if (boardResult.error) throw boardResult.error;
+  moderatorIds = new Set(globalResult.data.map(moderator => moderator.user_id));
+  boardModeratorBoardIds = new Map();
+  for (const assignment of boardResult.data) {
+    const boardIds = boardModeratorBoardIds.get(assignment.user_id) || new Set();
+    boardIds.add(assignment.board_id);
+    boardModeratorBoardIds.set(assignment.user_id, boardIds);
+  }
+}
+
+function canModerateBoard(userId, boardId) {
+  return moderatorIds.has(userId) || boardModeratorBoardIds.get(userId)?.has(boardId) === true;
 }
 
 function renderForumNews(news) {
@@ -267,10 +282,10 @@ function makeRatingBadge(rating) {
   return badge;
 }
 
-function appendMemberLabels(container, userId, rating) {
+function appendMemberLabels(container, userId, rating, boardId = null) {
   const labels = makeElement("span", "member-labels");
   let hasLabels = false;
-  if (moderatorIds.has(userId)) {
+  if (moderatorIds.has(userId) || (boardId !== null && canModerateBoard(userId, boardId))) {
     labels.append(makeModeratorBadge());
     hasLabels = true;
   }
@@ -912,11 +927,11 @@ async function loadBoardTopics(board, list, sort) {
       const replyCount = topic.replies?.[0]?.count || 0;
       const metadata = makeElement("p", "topic-meta");
       metadata.append(document.createTextNode(`${topic.profiles?.username || "member"} · ${formatDate(topic.updated_at)} · ${replyCount} replies`));
-      if (moderatorIds.has(topic.profiles?.id)) {
+      if (canModerateBoard(topic.profiles?.id, board.id)) {
         metadata.append(document.createTextNode(" "), makeModeratorBadge());
       }
       details.append(metadata, makeElement("p", "topic-preview", topic.body));
-      if (moderatorIds.has(currentUser?.id)) {
+      if (canModerateBoard(currentUser?.id, board.id)) {
         const pinButton = makeButton(
           topic.is_pinned ? "Unpin" : "Pin",
           `moderate-pin-topic:${topic.id}:${topic.is_pinned ? "false" : "true"}`,
@@ -924,15 +939,17 @@ async function loadBoardTopics(board, list, sort) {
         );
         pinButton.title = topic.is_pinned ? "Unpin this topic" : "Pin this topic to the top of the board";
         details.append(pinButton);
-        const featureButton = makeButton(
-          topic.is_featured ? "Unfeature" : "Feature",
-          `moderate-feature-topic:${topic.id}:${topic.is_featured ? "false" : "true"}`,
-          "small-button moderation-feature"
-        );
-        featureButton.title = topic.is_featured
-          ? "Remove this topic from featured"
-          : "Feature this topic across the forum; it will replace the current featured topic";
-        details.append(featureButton);
+        if (moderatorIds.has(currentUser?.id)) {
+          const featureButton = makeButton(
+            topic.is_featured ? "Unfeature" : "Feature",
+            `moderate-feature-topic:${topic.id}:${topic.is_featured ? "false" : "true"}`,
+            "small-button moderation-feature"
+          );
+          featureButton.title = topic.is_featured
+            ? "Remove this topic from featured"
+            : "Feature this topic across the forum; it will replace the current featured topic";
+          details.append(featureButton);
+        }
       }
       item.append(details);
       list.append(item);
@@ -976,7 +993,7 @@ function safeHttpsUrl(value) {
   }
 }
 
-function renderPost(profile, date, body, className, imageUrl = null, activity = null, moderationAction = null, memberRating = null, award = null, postType = null, postId = null, isFeatured = false) {
+function renderPost(profile, date, body, className, imageUrl = null, activity = null, moderationAction = null, memberRating = null, award = null, postType = null, postId = null, isFeatured = false, boardId = null) {
   const post = makeElement("article", `forum-post ${className}`);
   const author = profile?.username || "member";
   const authorPanel = makeElement("aside", "post-author");
@@ -996,7 +1013,7 @@ function renderPost(profile, date, body, className, imageUrl = null, activity = 
   }
   avatar.append(avatarImage);
   authorPanel.append(avatar, makeElement("strong", "post-author-name", author));
-  appendMemberLabels(authorPanel, profile?.id, memberRating);
+  appendMemberLabels(authorPanel, profile?.id, memberRating, boardId);
 
   const profileLink = safeHttpsUrl(profile?.profile_link);
   if (profileLink) {
@@ -1041,7 +1058,7 @@ function renderPost(profile, date, body, className, imageUrl = null, activity = 
     }
     header.append(voteGroup);
   }
-  if (moderationAction && moderatorIds.has(currentUser?.id)) {
+  if (moderationAction && boardId !== null && canModerateBoard(currentUser?.id, boardId)) {
     const deleteButton = makeButton("Delete", moderationAction, "small-button moderation-delete");
     deleteButton.title = "Remove this post";
     header.append(deleteButton);
@@ -1136,7 +1153,8 @@ async function showTopic(id) {
       topicAwards.get(`topic:${topic.id}`),
       "topic",
       topic.id,
-      topic.is_featured
+      topic.is_featured,
+      topic.board_id
     ));
     const repliesById = new Map(replies.map(reply => [reply.id, reply]));
     let replyTarget = null;
@@ -1154,7 +1172,9 @@ async function showTopic(id) {
         ratingsByUser.get(reply.profiles?.id),
         null,
         "reply",
-        reply.id
+        reply.id,
+        false,
+        topic.board_id
       );
       const parentReply = repliesById.get(reply.parent_reply_id);
       if (parentReply) {
@@ -1424,6 +1444,7 @@ function showComposer(slug) {
 
 function handleRoute() {
   const route = decodeURIComponent(window.location.hash.slice(1));
+  document.body.classList.toggle("rathner-board-theme", route === "board/rathner");
   const isMembersPage = route === "members" || route.startsWith("members/");
   navLinks.forEach(link => {
     const active = link.dataset.pageNav === (isMembersPage ? "members" : "forums");
@@ -1610,20 +1631,32 @@ function getTopicImagePath(imageUrl) {
 }
 
 async function moderateDeleteTopic(topicId) {
-  if (!moderatorIds.has(currentUser?.id)) throw new Error("Moderator access is required.");
   if (!window.confirm("Delete this topic and all of its replies? This cannot be undone.")) return;
 
   const { data: topic, error: topicError } = await supabase.from("topics")
-    .select("board_id,image_url")
+    .select("id,board_id,image_url")
     .eq("id", topicId)
     .maybeSingle();
   if (topicError) throw topicError;
   if (!topic) throw new Error("This topic no longer exists.");
+  if (!canModerateBoard(currentUser?.id, topic.board_id)) {
+    throw new Error("Moderator access is required for this board.");
+  }
 
   const { data: replies, error: repliesError } = await supabase.from("replies")
     .select("image_url")
     .eq("topic_id", topicId);
   if (repliesError) throw repliesError;
+
+  const imagePaths = [topic.image_url, ...replies.map(reply => reply.image_url)]
+    .map(getTopicImagePath)
+    .filter(Boolean);
+  let cleanupError = null;
+  const isGlobalModerator = moderatorIds.has(currentUser?.id);
+  if (imagePaths.length && !isGlobalModerator) {
+    const result = await supabase.storage.from("topic-images").remove(imagePaths);
+    cleanupError = result.error;
+  }
 
   const { data: deleted, error } = await supabase.from("topics")
     .delete()
@@ -1633,11 +1666,7 @@ async function moderateDeleteTopic(topicId) {
   if (error) throw error;
   if (!deleted) throw new Error("The topic could not be deleted. Check moderator access.");
 
-  const imagePaths = [topic.image_url, ...replies.map(reply => reply.image_url)]
-    .map(getTopicImagePath)
-    .filter(Boolean);
-  let cleanupError = null;
-  if (imagePaths.length) {
+  if (imagePaths.length && isGlobalModerator) {
     const result = await supabase.storage.from("topic-images").remove(imagePaths);
     cleanupError = result.error;
   }
@@ -1651,7 +1680,6 @@ async function moderateDeleteTopic(topicId) {
 }
 
 async function moderateDeleteReply(replyId) {
-  if (!moderatorIds.has(currentUser?.id)) throw new Error("Moderator access is required.");
   if (!window.confirm("Delete this reply? This cannot be undone.")) return;
 
   const { data: reply, error: replyError } = await supabase.from("replies")
@@ -1661,6 +1689,23 @@ async function moderateDeleteReply(replyId) {
   if (replyError) throw replyError;
   if (!reply) throw new Error("This reply no longer exists.");
 
+  const { data: topic, error: topicError } = await supabase.from("topics")
+    .select("board_id")
+    .eq("id", reply.topic_id)
+    .maybeSingle();
+  if (topicError) throw topicError;
+  if (!topic || !canModerateBoard(currentUser?.id, topic.board_id)) {
+    throw new Error("Moderator access is required for this board.");
+  }
+
+  const imagePath = getTopicImagePath(reply.image_url);
+  let cleanupError = null;
+  const isGlobalModerator = moderatorIds.has(currentUser?.id);
+  if (imagePath && !isGlobalModerator) {
+    const result = await supabase.storage.from("topic-images").remove([imagePath]);
+    cleanupError = result.error;
+  }
+
   const { data: deleted, error } = await supabase.from("replies")
     .delete()
     .eq("id", replyId)
@@ -1668,9 +1713,7 @@ async function moderateDeleteReply(replyId) {
     .maybeSingle();
   if (error) throw error;
   if (!deleted) throw new Error("The reply could not be deleted. Check moderator access.");
-  const imagePath = getTopicImagePath(reply.image_url);
-  let cleanupError = null;
-  if (imagePath) {
+  if (imagePath && isGlobalModerator) {
     const result = await supabase.storage.from("topic-images").remove([imagePath]);
     cleanupError = result.error;
   }
@@ -1701,8 +1744,15 @@ async function runModerationAction(action) {
     } else if (action.startsWith("moderate-delete-reply:")) {
       await moderateDeleteReply(action.slice("moderate-delete-reply:".length));
     } else if (action.startsWith("moderate-pin-topic:")) {
-      if (!moderatorIds.has(currentUser?.id)) throw new Error("Moderator access is required.");
       const [, topicId, pinnedValue] = action.split(":");
+      const { data: topic, error: topicError } = await supabase.from("topics")
+        .select("board_id")
+        .eq("id", topicId)
+        .maybeSingle();
+      if (topicError) throw topicError;
+      if (!topic || !canModerateBoard(currentUser?.id, topic.board_id)) {
+        throw new Error("Moderator access is required for this board.");
+      }
       const { error } = await supabase.rpc("set_topic_pinned", {
         p_topic_id: topicId,
         p_is_pinned: pinnedValue === "true"

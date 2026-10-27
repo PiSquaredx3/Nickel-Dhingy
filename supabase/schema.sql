@@ -93,6 +93,43 @@ create table if not exists public.boards (
   position integer not null unique
 );
 
+create table if not exists public.board_moderators (
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  board_id bigint not null references public.boards (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (user_id, board_id)
+);
+
+alter table public.board_moderators enable row level security;
+
+drop policy if exists "Board moderator assignments are publicly readable" on public.board_moderators;
+create policy "Board moderator assignments are publicly readable"
+  on public.board_moderators for select
+  using (true);
+
+revoke all on public.board_moderators from public, anon, authenticated;
+grant select on public.board_moderators to anon, authenticated;
+
+create or replace function public.can_moderate_board(target_board_id bigint)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1 from public.moderators
+    where user_id = (select auth.uid())
+  ) or exists (
+    select 1 from public.board_moderators
+    where user_id = (select auth.uid())
+      and board_id = target_board_id
+  );
+$$;
+
+revoke all on function public.can_moderate_board(bigint) from public, anon, authenticated;
+grant execute on function public.can_moderate_board(bigint) to authenticated;
+
 alter table public.boards
   drop column if exists icon,
   add column if not exists description text not null default '';
@@ -382,12 +419,9 @@ set search_path = ''
 as $$
 begin
   if new.is_pinned is distinct from old.is_pinned
-    and not exists (
-      select 1 from public.moderators
-      where user_id = (select auth.uid())
-    )
+    and not public.can_moderate_board(new.board_id)
   then
-    raise exception 'Only moderators can pin or unpin topics.';
+    raise exception 'Only moderators of this board can pin or unpin topics.';
   end if;
   return new;
 end;
@@ -430,10 +464,17 @@ set search_path = ''
 as $$
 begin
   if not exists (
-    select 1 from public.moderators
-    where user_id = (select auth.uid())
+    select 1 from public.topics where id = p_topic_id
   ) then
-    raise exception 'Moderator access is required to pin or unpin topics.';
+    raise exception 'This topic no longer exists.';
+  end if;
+
+  if not exists (
+    select 1 from public.topics
+    where id = p_topic_id
+      and public.can_moderate_board(board_id)
+  ) then
+    raise exception 'Moderator access to this board is required to pin or unpin topics.';
   end if;
 
   update public.topics
@@ -827,7 +868,7 @@ values
   ('art', 'Any&All Art', 'i suck at drawing', 'BOARDS', 3),
   ('games-recommendations', 'Any&All Games', 'Toxic Positivity.', 'BOARDS', 4),
   ('anime', 'Any&All Anime', 'I am NOT watching all 1000+ episodes of One piece; use spoiler warnings as needed.', 'EVEN MORE BOARDS', 5),
-  ('movies-tv', 'Any&All Movies & TV', 'real telivision only. like Bubble Guppies or Pete the Cat', 'EVEN MORE BOARDS', 6),
+  ('movies-tv', 'Any&All Movies & TV', 'real television only. like Bubble Guppies or Pete the Cat', 'EVEN MORE BOARDS', 6),
   ('music-discussion', 'Any&All Music Discussion', 'Your niche indie artist sucks cuh', 'EVEN MORE BOARDS', 7),
   ('hobbies-projects', 'Any&All Hobbies & Projects', '"Look at my cool shit"', 'EVEN MORE BOARDS', 8),
   ('tech', 'Any&All Tech', 'I require STP.', 'EVEN MORE BOARDS', 9),
@@ -839,6 +880,20 @@ on conflict (slug) do update set
   description = excluded.description,
   category = excluded.category,
   position = excluded.position;
+
+delete from public.moderators
+where user_id in (
+  select id from public.profiles
+  where lower(btrim(username)) = 'iloveturdsandpopps'
+);
+
+insert into public.board_moderators (user_id, board_id)
+select profiles.id, boards.id
+from public.profiles
+cross join public.boards
+where lower(btrim(profiles.username)) = 'iloveturdsandpopps'
+  and boards.slug = 'rathner'
+on conflict (user_id, board_id) do nothing;
 
 update public.topics
 set board_id = (select id from public.boards where slug = 'art')
@@ -1044,10 +1099,7 @@ create policy "Members can delete their own topics"
         or created_at > now() - interval '24 hours'
       )
     )
-    or exists (
-      select 1 from public.moderators
-      where user_id = (select auth.uid())
-    )
+    or public.can_moderate_board(board_id)
   );
 
 drop policy if exists "Replies are publicly readable" on public.replies;
@@ -1120,8 +1172,35 @@ create policy "Members can delete their own replies"
       )
     )
     or exists (
-      select 1 from public.moderators
-      where user_id = (select auth.uid())
+      select 1 from public.topics
+      where public.topics.id = public.replies.topic_id
+        and public.can_moderate_board(public.topics.board_id)
+    )
+  );
+
+drop policy if exists "Moderators can delete topic images" on storage.objects;
+create policy "Moderators can delete topic images"
+  on storage.objects for delete to authenticated
+  using (
+    bucket_id = 'topic-images'
+    and (
+      exists (
+        select 1 from public.moderators
+        where user_id = (select auth.uid())
+      )
+      or exists (
+        select 1
+        from public.topics
+        where public.can_moderate_board(public.topics.board_id)
+          and split_part(coalesce(public.topics.image_url, ''), '/topic-images/', 2) = storage.objects.name
+      )
+      or exists (
+        select 1
+        from public.replies
+        join public.topics on public.topics.id = public.replies.topic_id
+        where public.can_moderate_board(public.topics.board_id)
+          and split_part(coalesce(public.replies.image_url, ''), '/topic-images/', 2) = storage.objects.name
+      )
     )
   );
 

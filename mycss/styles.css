@@ -1749,6 +1749,132 @@ button:active {
     }
   }
 
+  body.rathner-board-theme {
+    background:
+      radial-gradient(ellipse at 50% 0, rgba(113, 70, 39, 0.48), transparent 52%),
+      repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.012) 0, rgba(255, 255, 255, 0.012) 1px, transparent 1px, transparent 5px),
+      #1b120d;
+    color: #e6d5c2;
+  }
+
+  .rathner-board-theme a {
+    color: #d6a574;
+  }
+
+  .rathner-board-theme a:hover,
+  .rathner-board-theme a:focus-visible {
+    color: #f0c99c;
+  }
+
+  .rathner-board-theme .site-shell {
+    border-color: #72563e;
+    background: #2a1e16;
+  }
+
+  .rathner-board-theme .masthead {
+    background: linear-gradient(180deg, #503a29 0%, #38291e 63%, #261b14 100%);
+    border-bottom-color: #170f0a;
+  }
+
+  .rathner-board-theme .masthead::before {
+    background:
+      radial-gradient(circle at 50% 130%, rgba(181, 123, 73, 0.28) 0 4%, transparent 4.5%),
+      repeating-conic-gradient(
+        from -90deg at 50% 130%,
+        rgba(181, 123, 73, 0.24) 0deg 4deg,
+        rgba(181, 123, 73, 0.035) 4deg 8deg
+      );
+  }
+
+  .rathner-board-theme .main-nav a.active {
+    border-color: #765b43;
+    background: #2a1e16;
+  }
+
+  .rathner-board-theme .page-content {
+    background: #2a1e16;
+  }
+
+  .rathner-board-theme .side-panel,
+  .rathner-board-theme .forum-view {
+    border-color: #6a4e37;
+    background: linear-gradient(145deg, #3b2a1e, #2c2017 80%);
+  }
+
+  .rathner-board-theme .forum-table-wrap {
+    border-color: #765b43;
+    background: #38281d;
+  }
+
+  .rathner-board-theme .forum-table thead {
+    background: linear-gradient(#604832, #493522);
+  }
+
+  .rathner-board-theme .forum-table thead th,
+  .rathner-board-theme .forum-table tbody tr:not(.category-row) > td {
+    border-color: #604832;
+  }
+
+  .rathner-board-theme .forum-table tbody tr:not(.category-row),
+  .rathner-board-theme .topic-list,
+  .rathner-board-theme .forum-post {
+    background: #35261b;
+  }
+
+  .rathner-board-theme .forum-table tbody tr:not(.category-row):nth-child(odd),
+  .rathner-board-theme .topic-list-item:nth-child(even) {
+    background: #302218;
+  }
+
+  .rathner-board-theme .forum-table tbody tr:not(.category-row):hover {
+    background: #493522;
+  }
+
+  .rathner-board-theme .forum-table .category-row th {
+    border-color: #765b43;
+    background: linear-gradient(#59412d, #44311f);
+    color: #f0c99c;
+  }
+
+  .rathner-board-theme .topic-list-item,
+  .rathner-board-theme .forum-post {
+    border-color: #604832;
+  }
+
+  .rathner-board-theme .topic-sort-select {
+    border-color: #765b43;
+    background: #35261b;
+    color: #e6d5c2;
+  }
+
+  .rathner-board-theme .small-button,
+  .rathner-board-theme .primary-button,
+  .rathner-board-theme .panel-action {
+    border-color: #846445;
+    background: linear-gradient(#684c32, #493522);
+    color: #f4e3ce;
+  }
+
+  .rathner-board-theme .primary-button,
+  .rathner-board-theme .panel-action {
+    border-color: #9a7145;
+    background: linear-gradient(#946b3e, #6e4b2c);
+  }
+
+  .rathner-board-theme .post-author {
+    border-color: #604832;
+    background: #302218;
+  }
+
+  .rathner-board-theme .post-content {
+    background: #35261b;
+  }
+
+  .rathner-board-theme .site-footer {
+    border-color: #170f0a;
+    background: linear-gradient(#3a291d, #2a1e16);
+  }
+
   .account-links > span {
     display: none;
   }
