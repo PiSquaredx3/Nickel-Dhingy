@@ -190,23 +190,84 @@ insert into public.post_voting_settings(singleton,early_voting_starts_at,early_v
 values(true,now(),now()+interval '14 days') on conflict(singleton) do nothing;
 
 -- Current board baseline. Existing boards keep their rows; only the title/description/category/position are refreshed.
-update public.boards set position = position + 100000;
+-- Temporarily move every existing board outside the 1..N range.
+-- This prevents unique-position conflicts when rerunning the schema and avoids cumulative offsets.
+update public.boards set position = -(id::integer + 1000000);
 insert into public.boards(slug,title,description,category,position) values
 ('introductions','Any&All Introductions','hi lol.','COMMUNITY & SITE',1),
 ('general','Any&All','If you dont know where to post, then uh post here. Go nuts.','COMMUNITY & SITE',2),
 ('site-help-feedback','Any&All Site Feedback','got an idea? i mean i guess you can tell me about..','COMMUNITY & SITE',3),
-('lolwhat',' lolwhat','lolwhat.','COMMUNITY & SITE',4),
+('lolwhat','Any&All lolwhat','lolwhat.','COMMUNITY & SITE',4),
 ('games-recommendations','Any&All Games','Toxic positivity.','GAMES & TECHNOLOGY',5),
 ('tech','Any&All Tech','"I require STP."','GAMES & TECHNOLOGY',6),
 ('hobbies-projects','Any&All Hobbies & Projects','Look at my cool shit','GAMES & TECHNOLOGY',7),
-('art','Any&All Art','I suck at drawing, but show us what you made anyway.','ART, MEDIA & CULTURE',8),
-('clips-images','Any&All Clips & Images','Mom, mom, get the camera.','ART, MEDIA & CULTURE',9),
+('art','Any&All Art','I suck at drawing, but show us what you made anyway.','ART & MEDIA',8),
+('clips-images','Any&All Clips & Images','Mom, mom, get the camera.','ART & MEDIA',9),
 ('anime','Any&All Anime','I am NOT watching all 1000+ episodes of One Piece. Spoiler warnings, please.','ART & MEDIA',10),
 ('movies-tv','Any&All Movies & TV','Talk about real television only. Like Bubble Guppies or Pete the Cat.','ART & MEDIA',11),
-('music-discussion','Any&All Music Discussion','Your niche indie artist sucks cuh. Share them anyway.','ART & MEDIA ',12),
+('music-discussion','Any&All Music Discussion','Your niche indie artist sucks cuh. Share them anyway.','ART & MEDIA',12),
 ('books-comics','Any&All Writing','Books, comics, webcomics, reading lists, and yuri we did not ask about.','ART & MEDIA',13),
 ('question-of-the-day','Question of the Day Archive','Archive of the daily questions.','DAILY QUESTION',14)
 on conflict(slug) do update set title=excluded.title,description=excluded.description,category=excluded.category,position=excluded.position;
+
+-- Move topics from retired boards before removing those boards.
+-- Without this step, deleting a board cascades and destroys its topics and replies.
+do $$
+declare
+  source_slug text;
+  destination_slug text;
+  source_id bigint;
+  destination_id bigint;
+begin
+  for source_slug,destination_slug in
+    values
+      ('dos-windows','general'),
+      ('adventure-games','clips-images'),
+      ('simulations','art'),
+      ('shareware','games-recommendations'),
+      ('nintendo-classics','games-recommendations'),
+      ('playstation-classics','games-recommendations'),
+      ('xbox-classics','games-recommendations'),
+      ('sega-other-classics','games-recommendations'),
+      ('nintendo','games-recommendations'),
+      ('playstation','games-recommendations'),
+      ('xbox','games-recommendations'),
+      ('sega-other-consoles','games-recommendations'),
+      ('off-topic','general'),
+      ('general-2','general'),
+      ('music','music-discussion'),
+      ('tech-internet','general'),
+      ('food-drink','general'),
+      ('art-art-adjacent','art'),
+      ('art-adjacent','art'),
+      ('mods-creations','art')
+  loop
+    select id into source_id from public.boards where slug=source_slug;
+    select id into destination_id from public.boards where slug=destination_slug;
+    if source_id is not null and destination_id is not null and source_id <> destination_id then
+      update public.topics set board_id=destination_id where board_id=source_id;
+      insert into public.board_moderators(user_id,board_id)
+        select user_id,destination_id
+        from public.board_moderators
+        where board_id=source_id
+      on conflict(user_id,board_id) do nothing;
+      delete from public.boards where id=source_id;
+    end if;
+  end loop;
+end $$;
+
+-- Keep any intentionally preserved custom boards (for example Rathner) after the baseline boards.
+with ordered as (
+  select id,(14 + row_number() over (order by position,id))::integer as new_position
+  from public.boards
+  where slug not in (
+    'introductions','general','site-help-feedback','lolwhat','games-recommendations',
+    'tech','hobbies-projects','art','clips-images','anime','movies-tv',
+    'music-discussion','books-comics','question-of-the-day'
+  )
+)
+update public.boards b set position=ordered.new_position
+from ordered where b.id=ordered.id;
 
 insert into public.moderators(user_id)
 select id from public.profiles where lower(username)='pi_'
