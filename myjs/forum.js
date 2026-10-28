@@ -272,8 +272,6 @@ function dateIsWithin(date, startMonth, startDay, endMonth, endDay) {
 
 function getAutomaticHolidayTheme(date = new Date()) {
   const easter = easterSunday(date.getFullYear());
-  const easterEnd = new Date(easter);
-  easterEnd.setDate(easter.getDate() + 6);
   const thanksgiving = thanksgivingDate(date.getFullYear());
   const thanksgivingEnd = new Date(thanksgiving);
   thanksgivingEnd.setDate(thanksgiving.getDate() + 3);
@@ -281,14 +279,14 @@ function getAutomaticHolidayTheme(date = new Date()) {
   thanksgivingStart.setDate(thanksgiving.getDate() - 3);
 
   const value = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
-  if (value >= easter.getTime() && value <= easterEnd.getTime()) return "easter";
+  if (value === easter.getTime()) return "easter";
   if (value >= thanksgivingStart.getTime() && value <= thanksgivingEnd.getTime()) return "thanksgiving";
-  if ((date.getMonth() === 11 && date.getDate() === 31) || (date.getMonth() === 0 && date.getDate() <= 7)) return "new-year";
+  if ((date.getMonth() === 11 && date.getDate() === 31) || (date.getMonth() === 0 && date.getDate() === 1)) return "new-year";
   if (dateIsWithin(date, 12, 18, 12, 24)) return "christmas";
   if (dateIsWithin(date, 12, 25, 12, 31)) return "christmas";
-  if (dateIsWithin(date, 2, 7, 2, 14)) return "valentine";
-  if (dateIsWithin(date, 3, 14, 3, 17)) return "st-patrick";
-  if (dateIsWithin(date, 6, 29, 7, 5)) return "fourth-of-july";
+  if (date.getMonth() === 1 && date.getDate() === 14) return "valentine";
+  if (date.getMonth() === 2 && date.getDate() === 17) return "st-patrick";
+  if (date.getMonth() === 6 && date.getDate() === 4) return "fourth-of-july";
   if (dateIsWithin(date, 10, 24, 10, 31)) return "halloween";
   return "default";
 }
