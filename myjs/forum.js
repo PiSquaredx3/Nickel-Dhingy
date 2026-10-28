@@ -325,7 +325,9 @@ function applySiteTheme(theme) {
 }
 
 function setupAdminThemeControl(user) {
-  const links = document.querySelector("#account-links");
+  const container = document.querySelector("#theme-control-container");
+  if (!container) return;
+  container.replaceChildren();
   if (!moderatorIds.has(user?.id)) return;
 
   let savedTheme = "default";
@@ -347,7 +349,7 @@ function setupAdminThemeControl(user) {
     applySiteTheme(select.value);
   });
   control.append(makeElement("span", "theme-control-label", "Theme"), select);
-  links.append(control);
+  container.append(control);
 }
 
 function updateAccount(user) {
@@ -393,6 +395,7 @@ function updateAccount(user) {
     links.append(makeButton("Sign up", "auth-signup", "text-button"));
     links.append(makeElement("span", "", "|"));
     links.append(makeButton("Log in", "auth-login", "text-button"));
+    setupAdminThemeControl(null);
   }
 }
 

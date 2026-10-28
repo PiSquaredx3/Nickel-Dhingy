@@ -192,18 +192,20 @@ values(true,now(),now()+interval '14 days') on conflict(singleton) do nothing;
 -- Current board baseline. Existing boards keep their rows; only the title/description/category/position are refreshed.
 update public.boards set position = position + 100000;
 insert into public.boards(slug,title,description,category,position) values
-('general','Any&All','if you dont know where to post, then uh post here','BOARDS',1),
-('clips-images','Any&All Clips & Images','mom, mom get the camera','BOARDS',2),
-('art','Any&All Art','i suck at drawing','BOARDS',3),
-('games-recommendations','Any&All Games','Toxic Positivity.','BOARDS',4),
-('anime','Any&All Anime','I am NOT watching all 1000+ episodes of One piece; use spoiler warnings as needed.','EVEN MORE BOARDS',5),
-('movies-tv','Any&All Movies & TV','talk about real television only. like Bubble Guppies or Pete the Cat','EVEN MORE BOARDS',6),
-('music-discussion','Any&All Music Discussion','Your niche indie artist sucks cuh','EVEN MORE BOARDS',7),
-('hobbies-projects','Any&All Hobbies & Projects','"Look at my cool shit"','EVEN MORE BOARDS',8),
-('tech','Any&All Tech','I require STP.','EVEN MORE BOARDS',9),
-('books-comics','Any&All Writing','do you wanna see my furry fanfiction?','EVEN MORE BOARDS',10),
-('lolwhat','lolwhat','lolwhat','EVEN MORE BOARDS',11),
-('question-of-the-day','Question of the Day Archive','Archive of the daily questions.','DAILY QUESTION',12)
+('introductions','Any&All Introductions','hi lol.','COMMUNITY & SITE',1),
+('general','Any&All','If you dont know where to post, then uh post here. Go nuts.','COMMUNITY & SITE',2),
+('site-help-feedback','Any&All Site Feedback','got an idea? i mean i guess you can tell me about..','COMMUNITY & SITE',3),
+('lolwhat',' lolwhat','lolwhat.','COMMUNITY & SITE',4),
+('games-recommendations','Any&All Games','Toxic positivity.','GAMES & TECHNOLOGY',5),
+('tech','Any&All Tech','"I require STP."','GAMES & TECHNOLOGY',6),
+('hobbies-projects','Any&All Hobbies & Projects','Look at my cool shit','GAMES & TECHNOLOGY',7),
+('art','Any&All Art','I suck at drawing, but show us what you made anyway.','ART, MEDIA & CULTURE',8),
+('clips-images','Any&All Clips & Images','Mom, mom, get the camera.','ART, MEDIA & CULTURE',9),
+('anime','Any&All Anime','I am NOT watching all 1000+ episodes of One Piece. Spoiler warnings, please.','ART & MEDIA',10),
+('movies-tv','Any&All Movies & TV','Talk about real television only. Like Bubble Guppies or Pete the Cat.','ART & MEDIA',11),
+('music-discussion','Any&All Music Discussion','Your niche indie artist sucks cuh. Share them anyway.','ART & MEDIA ',12),
+('books-comics','Any&All Writing','Books, comics, webcomics, reading lists, and yuri we did not ask about.','ART & MEDIA',13),
+('question-of-the-day','Question of the Day Archive','Archive of the daily questions.','DAILY QUESTION',14)
 on conflict(slug) do update set title=excluded.title,description=excluded.description,category=excluded.category,position=excluded.position;
 
 insert into public.moderators(user_id)
