@@ -235,6 +235,28 @@ function setStat(name, value) {
   });
 }
 
+function setupOnlinePresence(client) {
+  const presenceKey = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
+  const channel = client.channel("site-online-presence", {
+    config: { presence: { key: presenceKey } }
+  });
+
+  const updateOnlineCount = () => {
+    const onlineCount = Object.keys(channel.presenceState()).length;
+    setStat("online", onlineCount);
+  };
+
+  channel
+    .on("presence", { event: "sync" }, updateOnlineCount)
+    .on("presence", { event: "join" }, updateOnlineCount)
+    .on("presence", { event: "leave" }, updateOnlineCount)
+    .subscribe(status => {
+      if (status === "SUBSCRIBED") {
+        void channel.track({ online_at: new Date().toISOString() });
+      }
+    });
+}
+
 function easterSunday(year) {
   const a = year % 19;
   const b = Math.floor(year / 100);
@@ -2017,6 +2039,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
   try {
     const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
     supabase = createClient(supabaseUrl, supabaseAnonKey);
+    setupOnlinePresence(supabase);
     supabase.auth.onAuthStateChange(event => {
       if (event === "PASSWORD_RECOVERY") {
         openAuth("reset-update");
