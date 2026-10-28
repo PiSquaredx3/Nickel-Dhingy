@@ -1,5 +1,9 @@
+-- Nickel Dhingy forum schema
+-- Idempotent baseline: safe to run on an existing Supabase project.
+-- This does not drop forum tables or delete existing posts, profiles, or votes.
+
 create table if not exists public.profiles (
-  id uuid primary key references auth.users (id) on delete cascade,
+  id uuid primary key references auth.users(id) on delete cascade,
   username text not null unique,
   avatar_url text,
   signature text,
@@ -7,47 +11,28 @@ create table if not exists public.profiles (
   created_at timestamptz not null default now(),
   constraint profiles_username_format check (username ~ '^[A-Za-z0-9_]{3,24}$')
 );
+alter table public.profiles add column if not exists avatar_url text;
+alter table public.profiles add column if not exists signature text;
+alter table public.profiles add column if not exists profile_link text;
 
+alter table public.profiles drop constraint if exists profiles_avatar_url_https;
+alter table public.profiles drop constraint if exists profiles_signature_length;
+alter table public.profiles drop constraint if exists profiles_profile_link_https;
 alter table public.profiles
-  add column if not exists avatar_url text,
-  add column if not exists signature text,
-  add column if not exists profile_link text;
-
-alter table public.profiles
-  drop constraint if exists profiles_avatar_url_https,
-  drop constraint if exists profiles_signature_length,
-  drop constraint if exists profiles_profile_link_https;
-
-alter table public.profiles
-  add constraint profiles_avatar_url_https
-    check (avatar_url is null or (char_length(avatar_url) <= 500 and avatar_url ~* '^https://')),
-  add constraint profiles_signature_length
-    check (signature is null or char_length(signature) <= 240),
-  add constraint profiles_profile_link_https
-    check (profile_link is null or (char_length(profile_link) <= 500 and profile_link ~* '^https://'));
-
-create unique index if not exists profiles_username_case_insensitive
-  on public.profiles (lower(username));
+  add constraint profiles_avatar_url_https check (avatar_url is null or (char_length(avatar_url) <= 500 and avatar_url ~* '^https://')),
+  add constraint profiles_signature_length check (signature is null or char_length(signature) <= 240),
+  add constraint profiles_profile_link_https check (profile_link is null or (char_length(profile_link) <= 500 and profile_link ~* '^https://'));
+create unique index if not exists profiles_username_case_insensitive on public.profiles(lower(username));
 
 create or replace function public.is_reserved_username(requested_username text)
-returns boolean
-language sql
-immutable
-set search_path = ''
-as $$
-  select lower(btrim(coalesce(requested_username, ''))) ~
-    'admin|moderator|(^|[_0-9])(mod|mods|staff|support|owner|owners)([_0-9]|$)'
+returns boolean language sql immutable set search_path = '' as $$
+  select lower(btrim(coalesce(requested_username, ''))) ~ 'admin|moderator|(^|[_0-9])(mod|mods|staff|support|owner|owners)([_0-9]|$)'
     or lower(btrim(coalesce(requested_username, ''))) ~ '(^|[_0-9])pi([_0-9]|$)'
-    or lower(btrim(coalesce(requested_username, ''))) in (
-      'pisquaredx3', 'nickel', 'nickeldhingy', 'nickel_dhingy'
-    );
+    or lower(btrim(coalesce(requested_username, ''))) in ('pisquaredx3','nickel','nickeldhingy','nickel_dhingy');
 $$;
 
 create or replace function public.prevent_reserved_username()
-returns trigger
-language plpgsql
-set search_path = ''
-as $$
+returns trigger language plpgsql set search_path = '' as $$
 begin
   if public.is_reserved_username(new.username) then
     raise exception 'That forum name is reserved for staff or the site owner.';
@@ -55,56 +40,15 @@ begin
   return new;
 end;
 $$;
-
 drop trigger if exists enforce_reserved_profile_username_insert on public.profiles;
-create trigger enforce_reserved_profile_username_insert
-  before insert on public.profiles
-  for each row execute procedure public.prevent_reserved_username();
-
+create trigger enforce_reserved_profile_username_insert before insert on public.profiles for each row execute procedure public.prevent_reserved_username();
 drop trigger if exists enforce_reserved_profile_username_update on public.profiles;
-create trigger enforce_reserved_profile_username_update
-  before update of username on public.profiles
-  for each row execute procedure public.prevent_reserved_username();
+create trigger enforce_reserved_profile_username_update before update of username on public.profiles for each row execute procedure public.prevent_reserved_username();
 
 create table if not exists public.moderators (
-  user_id uuid primary key references public.profiles (id) on delete cascade,
+  user_id uuid primary key references public.profiles(id) on delete cascade,
   created_at timestamptz not null default now()
 );
-
-alter table public.moderators enable row level security;
-
-drop policy if exists "Moderator status is publicly readable" on public.moderators;
-create policy "Moderator status is publicly readable"
-  on public.moderators for select
-  using (true);
-
-revoke all on public.moderators from anon, authenticated;
-grant select on public.moderators to anon, authenticated;
-
-insert into public.moderators (user_id)
-select id from public.profiles where username = 'pi_'
-on conflict (user_id) do nothing;
-
-do $$
-declare
-  boards_kind "char";
-begin
-  select c.relkind into boards_kind
-  from pg_class c
-  join pg_namespace n on n.oid = c.relnamespace
-  where n.nspname = 'public'
-    and c.relname = 'boards';
-
-  if boards_kind = 'v' then
-    execute 'drop view public.boards cascade';
-  elsif boards_kind = 'm' then
-    execute 'drop materialized view public.boards cascade';
-  elsif boards_kind is not null and boards_kind <> 'r' then
-    raise exception 'public.boards exists with unsupported relation type %', boards_kind;
-  end if;
-end;
-$$;
-
 create table if not exists public.boards (
   id bigint generated by default as identity primary key,
   slug text not null unique,
@@ -113,1040 +57,407 @@ create table if not exists public.boards (
   position integer not null unique,
   description text not null default ''
 );
+alter table public.boards add column if not exists description text not null default '';
 
 create table if not exists public.board_moderators (
-  user_id uuid not null references public.profiles (id) on delete cascade,
-  board_id bigint not null references public.boards (id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  board_id bigint not null references public.boards(id) on delete cascade,
   created_at timestamptz not null default now(),
-  primary key (user_id, board_id)
+  primary key(user_id, board_id)
 );
 
-alter table public.board_moderators enable row level security;
-
-drop policy if exists "Board moderator assignments are publicly readable" on public.board_moderators;
-create policy "Board moderator assignments are publicly readable"
-  on public.board_moderators for select
-  using (true);
-
-revoke all on public.board_moderators from public, anon, authenticated;
-grant select on public.board_moderators to anon, authenticated;
-
 create or replace function public.can_moderate_board(target_board_id bigint)
-returns boolean
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select exists (
-    select 1 from public.moderators
-    where user_id = (select auth.uid())
-  ) or exists (
-    select 1 from public.board_moderators
-    where user_id = (select auth.uid())
-      and board_id = target_board_id
-  );
+returns boolean language sql stable security definer set search_path = '' as $$
+  select exists (select 1 from public.moderators where user_id = (select auth.uid()))
+    or exists (select 1 from public.board_moderators where user_id = (select auth.uid()) and board_id = target_board_id);
 $$;
-
 revoke all on function public.can_moderate_board(bigint) from public, anon, authenticated;
 grant execute on function public.can_moderate_board(bigint) to authenticated;
 
-alter table public.boards
-  add column if not exists description text not null default '';
-
 create table if not exists public.forum_news (
-  singleton boolean primary key default true check (singleton),
-  headline text not null check (char_length(btrim(headline)) between 1 and 80),
-  body text not null check (char_length(btrim(body)) between 1 and 1000)
+  singleton boolean primary key default true check(singleton),
+  headline text not null check(char_length(btrim(headline)) between 1 and 80),
+  body text not null check(char_length(btrim(body)) between 1 and 1000)
 );
+insert into public.forum_news(singleton, headline, body)
+values(true, 'hi.', 'I made this place out of bordem of a 12 hour saturday shift. Go Nuts.')
+on conflict(singleton) do nothing;
 
-insert into public.forum_news (singleton, headline, body)
-values (true, 'hi.', 'I made this place out of bordem of a 12 hour saturday shift. Go Nuts.')
-on conflict (singleton) do nothing;
+insert into storage.buckets(id, name, public, file_size_limit, allowed_mime_types)
+values('profile-avatars','profile-avatars',true,2097152,array['image/jpeg','image/gif','image/webp','image/png'])
+on conflict(id) do update set public=excluded.public,file_size_limit=excluded.file_size_limit,allowed_mime_types=excluded.allowed_mime_types;
+insert into storage.buckets(id, name, public, file_size_limit, allowed_mime_types)
+values('topic-images','topic-images',true,2097152,array['image/jpeg','image/gif','image/webp','image/png'])
+on conflict(id) do update set public=excluded.public,file_size_limit=excluded.file_size_limit,allowed_mime_types=excluded.allowed_mime_types;
 
-alter table public.forum_news enable row level security;
-revoke all on public.forum_news from public, anon, authenticated;
-
-drop policy if exists "Forum news is publicly readable" on public.forum_news;
-create policy "Forum news is publicly readable"
-  on public.forum_news for select
-  using (true);
-
-drop policy if exists "Moderators can update forum news" on public.forum_news;
-create policy "Moderators can update forum news"
-  on public.forum_news for update to authenticated
-  using (
-    exists (
-      select 1 from public.moderators
-      where user_id = (select auth.uid())
-    )
-  )
-  with check (
-    exists (
-      select 1 from public.moderators
-      where user_id = (select auth.uid())
-    )
-  );
-
-grant select on public.forum_news to anon, authenticated;
-grant update on public.forum_news to authenticated;
-
-insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values (
-  'profile-avatars',
-  'profile-avatars',
-  true,
-  2097152,
-  array['image/jpeg', 'image/gif', 'image/webp', 'image/png']
-)
-on conflict (id) do update set
-  public = excluded.public,
-  file_size_limit = excluded.file_size_limit,
-  allowed_mime_types = excluded.allowed_mime_types;
-
-insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values (
-  'topic-images',
-  'topic-images',
-  true,
-  2097152,
-  array['image/jpeg', 'image/gif', 'image/webp', 'image/png']
-)
-on conflict (id) do update set
-  public = excluded.public,
-  file_size_limit = excluded.file_size_limit,
-  allowed_mime_types = excluded.allowed_mime_types;
-
-drop policy if exists "Members can read their own avatar files" on storage.objects;
-create policy "Members can read their own avatar files"
-  on storage.objects for select to authenticated
-  using (
-    bucket_id = 'profile-avatars'
-    and (storage.foldername(name))[1] = (select auth.uid())::text
-  );
-
+drop policy if exists "Profile avatars are publicly readable" on storage.objects;
+create policy "Profile avatars are publicly readable" on storage.objects for select using(bucket_id='profile-avatars');
 drop policy if exists "Members can upload their own avatar files" on storage.objects;
-create policy "Members can upload their own avatar files"
-  on storage.objects for insert to authenticated
-  with check (
-    bucket_id = 'profile-avatars'
-    and (storage.foldername(name))[1] = (select auth.uid())::text
-  );
-
+create policy "Members can upload their own avatar files" on storage.objects for insert to authenticated with check(bucket_id='profile-avatars' and (storage.foldername(name))[1]=(select auth.uid())::text);
 drop policy if exists "Members can update their own avatar files" on storage.objects;
-create policy "Members can update their own avatar files"
-  on storage.objects for update to authenticated
-  using (
-    bucket_id = 'profile-avatars'
-    and (storage.foldername(name))[1] = (select auth.uid())::text
-  )
-  with check (
-    bucket_id = 'profile-avatars'
-    and (storage.foldername(name))[1] = (select auth.uid())::text
-  );
+create policy "Members can update their own avatar files" on storage.objects for update to authenticated using(bucket_id='profile-avatars' and (storage.foldername(name))[1]=(select auth.uid())::text) with check(bucket_id='profile-avatars' and (storage.foldername(name))[1]=(select auth.uid())::text);
+drop policy if exists "Members can delete their own avatar files" on storage.objects;
+create policy "Members can delete their own avatar files" on storage.objects for delete to authenticated using(bucket_id='profile-avatars' and (storage.foldername(name))[1]=(select auth.uid())::text);
 
 drop policy if exists "Topic images are publicly readable" on storage.objects;
-create policy "Topic images are publicly readable"
-  on storage.objects for select
-  using (bucket_id = 'topic-images');
-
+create policy "Topic images are publicly readable" on storage.objects for select using(bucket_id='topic-images');
 drop policy if exists "Members can upload their own topic images" on storage.objects;
-create policy "Members can upload their own topic images"
-  on storage.objects for insert to authenticated
-  with check (
-    bucket_id = 'topic-images'
-    and (storage.foldername(name))[1] = (select auth.uid())::text
-  );
-
+create policy "Members can upload their own topic images" on storage.objects for insert to authenticated with check(bucket_id='topic-images' and (storage.foldername(name))[1]=(select auth.uid())::text);
+drop policy if exists "Members can update their own topic images" on storage.objects;
+create policy "Members can update their own topic images" on storage.objects for update to authenticated using(bucket_id='topic-images' and (storage.foldername(name))[1]=(select auth.uid())::text) with check(bucket_id='topic-images' and (storage.foldername(name))[1]=(select auth.uid())::text);
 drop policy if exists "Members can delete their own topic images" on storage.objects;
-create policy "Members can delete their own topic images"
-  on storage.objects for delete to authenticated
-  using (
-    bucket_id = 'topic-images'
-    and (storage.foldername(name))[1] = (select auth.uid())::text
-  );
+create policy "Members can delete their own topic images" on storage.objects for delete to authenticated using(bucket_id='topic-images' and (storage.foldername(name))[1]=(select auth.uid())::text);
 
 drop policy if exists "Moderators can delete topic images" on storage.objects;
-create policy "Moderators can delete topic images"
-  on storage.objects for delete to authenticated
-  using (
-    bucket_id = 'topic-images'
-    and exists (
-      select 1 from public.moderators
-      where user_id = (select auth.uid())
-    )
-  );
+create policy "Moderators can delete topic images" on storage.objects for delete to authenticated using(bucket_id='topic-images' and exists(select 1 from public.moderators where user_id=(select auth.uid())));
 
 create table if not exists public.topics (
   id uuid primary key default gen_random_uuid(),
-  board_id bigint not null references public.boards (id) on delete cascade,
-  author_id uuid not null constraint topics_author_id_fkey references public.profiles (id) on delete cascade,
+  board_id bigint not null references public.boards(id) on delete cascade,
+  author_id uuid not null constraint topics_author_id_fkey references public.profiles(id) on delete cascade,
   title text not null,
   body text not null,
   image_url text,
   is_pinned boolean not null default false,
+  is_featured boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint topics_title_length check (char_length(btrim(title)) between 1 and 120),
-  constraint topics_body_length check (char_length(btrim(body)) between 1 and 10000)
+  constraint topics_title_length check(char_length(btrim(title)) between 1 and 120),
+  constraint topics_body_length check(char_length(btrim(body)) between 1 and 10000)
 );
-
-alter table public.topics
-  add column if not exists image_url text,
-  add column if not exists is_pinned boolean not null default false,
-  add column if not exists is_featured boolean not null default false;
-
-create unique index if not exists topics_single_featured
-  on public.topics (is_featured)
-  where is_featured;
-
-create or replace function public.enforce_daily_question_topic_dates()
-returns trigger
-language plpgsql
-set search_path = ''
-as $$
-declare
-  is_daily_question boolean;
-  was_daily_question boolean;
-begin
-  if tg_op = 'INSERT' then
-    select slug = 'question-of-the-day'
-    into is_daily_question
-    from public.boards
-    where id = new.board_id;
-    if is_daily_question then
-      new.created_at := now();
-    end if;
-    return new;
-  end if;
-
-  select slug = 'question-of-the-day'
-  into was_daily_question
-  from public.boards
-  where id = old.board_id;
-  select slug = 'question-of-the-day'
-  into is_daily_question
-  from public.boards
-  where id = new.board_id;
-
-  if was_daily_question or is_daily_question then
-    if old.board_id is distinct from new.board_id then
-      raise exception 'Daily question topics cannot be moved to another board.';
-    end if;
-    if old.created_at is distinct from new.created_at then
-      raise exception 'Daily question creation times cannot be changed.';
-    end if;
-  end if;
-  return new;
-end;
-$$;
-
-drop trigger if exists enforce_daily_question_topic_dates on public.topics;
-create trigger enforce_daily_question_topic_dates
-  before insert on public.topics
-  for each row execute procedure public.enforce_daily_question_topic_dates();
-drop trigger if exists enforce_daily_question_topic_dates_on_update on public.topics;
-create trigger enforce_daily_question_topic_dates_on_update
-  before update of board_id, created_at on public.topics
-  for each row execute procedure public.enforce_daily_question_topic_dates();
+alter table public.topics add column if not exists image_url text;
+alter table public.topics add column if not exists is_pinned boolean not null default false;
+alter table public.topics add column if not exists is_featured boolean not null default false;
+create unique index if not exists topics_single_featured on public.topics(is_featured) where is_featured;
 
 create table if not exists public.replies (
   id uuid primary key default gen_random_uuid(),
-  topic_id uuid not null references public.topics (id) on delete cascade,
-  author_id uuid not null constraint replies_author_id_fkey references public.profiles (id) on delete cascade,
-  parent_reply_id uuid references public.replies (id) on delete set null,
+  topic_id uuid not null references public.topics(id) on delete cascade,
+  author_id uuid not null constraint replies_author_id_fkey references public.profiles(id) on delete cascade,
+  parent_reply_id uuid references public.replies(id) on delete set null,
   body text not null,
   image_url text,
   created_at timestamptz not null default now(),
-  constraint replies_body_length check (char_length(btrim(body)) between 1 and 10000)
+  constraint replies_body_length check(char_length(btrim(body)) between 1 and 10000)
 );
+alter table public.replies add column if not exists parent_reply_id uuid references public.replies(id) on delete set null;
+alter table public.replies add column if not exists image_url text;
 
-alter table public.replies
-  add column if not exists parent_reply_id uuid references public.replies (id) on delete set null,
-  add column if not exists image_url text;
-
-create index if not exists topics_board_updated_at on public.topics (board_id, updated_at desc);
-create index if not exists topics_board_pinned_updated_at
-  on public.topics (board_id, is_pinned desc, updated_at desc);
-create index if not exists topics_author_id on public.topics (author_id);
-create index if not exists replies_topic_created_at on public.replies (topic_id, created_at);
-create index if not exists replies_author_id on public.replies (author_id);
-create index if not exists replies_parent_reply_id on public.replies (parent_reply_id);
-
-create or replace function public.validate_reply_parent()
-returns trigger
-language plpgsql
-set search_path = ''
-as $$
-declare
-  parent_topic_id uuid;
-begin
-  if new.parent_reply_id is null then
-    return new;
-  end if;
-  if new.parent_reply_id = new.id then
-    raise exception 'A reply cannot target itself.';
-  end if;
-
-  select topic_id into parent_topic_id
-  from public.replies
-  where id = new.parent_reply_id;
-
-  if parent_topic_id is null then
-    raise exception 'The reply being referenced no longer exists.';
-  end if;
-  if parent_topic_id <> new.topic_id then
-    raise exception 'Replies can only target a reply in the same topic.';
-  end if;
-  return new;
-end;
-$$;
-
-drop trigger if exists validate_reply_parent on public.replies;
-create trigger validate_reply_parent
-  before insert or update of parent_reply_id, topic_id on public.replies
-  for each row execute procedure public.validate_reply_parent();
+create index if not exists topics_board_updated_at on public.topics(board_id, updated_at desc);
+create index if not exists topics_board_pinned_updated_at on public.topics(board_id, is_pinned desc, updated_at desc);
+create index if not exists topics_author_id on public.topics(author_id);
+create index if not exists replies_topic_created_at on public.replies(topic_id, created_at);
+create index if not exists replies_author_id on public.replies(author_id);
+create index if not exists replies_parent_reply_id on public.replies(parent_reply_id);
 
 create table if not exists public.reply_notifications (
   id uuid primary key default gen_random_uuid(),
-  recipient_id uuid not null references public.profiles (id) on delete cascade,
-  reply_id uuid not null references public.replies (id) on delete cascade,
-  notification_type text not null default 'topic' check (notification_type in ('topic', 'reply')),
+  recipient_id uuid not null references public.profiles(id) on delete cascade,
+  reply_id uuid not null references public.replies(id) on delete cascade,
+  notification_type text not null default 'topic' check(notification_type in ('topic','reply')),
   created_at timestamptz not null default now(),
   read_at timestamptz,
-  unique (recipient_id, reply_id)
+  unique(recipient_id, reply_id)
 );
-
-alter table public.reply_notifications
-  add column if not exists notification_type text not null default 'topic';
-
-alter table public.reply_notifications
-  drop constraint if exists reply_notifications_notification_type_check,
-  add constraint reply_notifications_notification_type_check
-    check (notification_type in ('topic', 'reply'));
-
-create index if not exists reply_notifications_recipient_created_at
-  on public.reply_notifications (recipient_id, created_at desc);
-create index if not exists reply_notifications_unread_recipient
-  on public.reply_notifications (recipient_id)
-  where read_at is null;
-
-create or replace function public.prevent_non_moderator_topic_pin_change()
-returns trigger
-language plpgsql
-security definer
-set search_path = ''
-as $$
-begin
-  if new.is_pinned is distinct from old.is_pinned
-    and not public.can_moderate_board(new.board_id)
-  then
-    raise exception 'Only moderators of this board can pin or unpin topics.';
-  end if;
-  return new;
-end;
-$$;
-
-drop trigger if exists enforce_moderator_topic_pinning on public.topics;
-create trigger enforce_moderator_topic_pinning
-  before update of is_pinned on public.topics
-  for each row execute procedure public.prevent_non_moderator_topic_pin_change();
-
-create or replace function public.prevent_non_moderator_topic_feature_change()
-returns trigger
-language plpgsql
-security definer
-set search_path = ''
-as $$
-begin
-  if new.is_featured is distinct from old.is_featured
-    and not exists (
-      select 1 from public.moderators
-      where user_id = (select auth.uid())
-    )
-  then
-    raise exception 'Only moderators can feature or unfeature topics.';
-  end if;
-  return new;
-end;
-$$;
-
-drop trigger if exists enforce_moderator_topic_featuring on public.topics;
-create trigger enforce_moderator_topic_featuring
-  before update of is_featured on public.topics
-  for each row execute procedure public.prevent_non_moderator_topic_feature_change();
-
-create or replace function public.set_topic_pinned(p_topic_id uuid, p_is_pinned boolean)
-returns void
-language plpgsql
-security definer
-set search_path = ''
-as $$
-begin
-  if not exists (
-    select 1 from public.topics where id = p_topic_id
-  ) then
-    raise exception 'This topic no longer exists.';
-  end if;
-
-  if not exists (
-    select 1 from public.topics
-    where id = p_topic_id
-      and public.can_moderate_board(board_id)
-  ) then
-    raise exception 'Moderator access to this board is required to pin or unpin topics.';
-  end if;
-
-  update public.topics
-  set is_pinned = p_is_pinned
-  where id = p_topic_id;
-
-  if not found then
-    raise exception 'This topic no longer exists.';
-  end if;
-end;
-$$;
-
-revoke all on function public.set_topic_pinned(uuid, boolean) from public, anon, authenticated;
-grant execute on function public.set_topic_pinned(uuid, boolean) to authenticated;
-
-create or replace function public.set_topic_featured(p_topic_id uuid, p_is_featured boolean)
-returns void
-language plpgsql
-security definer
-set search_path = ''
-as $$
-begin
-  if not exists (
-    select 1 from public.moderators
-    where user_id = (select auth.uid())
-  ) then
-    raise exception 'Moderator access is required to feature or unfeature topics.';
-  end if;
-
-  lock table public.topics in share row exclusive mode;
-
-  if not exists (
-    select 1 from public.topics
-    where id = p_topic_id
-  ) then
-    raise exception 'This topic no longer exists.';
-  end if;
-
-  if p_is_featured then
-    update public.topics
-    set is_featured = false
-    where is_featured and id <> p_topic_id;
-  end if;
-
-  update public.topics
-  set is_featured = p_is_featured
-  where id = p_topic_id;
-end;
-$$;
-
-revoke all on function public.set_topic_featured(uuid, boolean) from public, anon, authenticated;
-grant execute on function public.set_topic_featured(uuid, boolean) to authenticated;
-
-drop view if exists public.member_activity;
+alter table public.reply_notifications add column if not exists notification_type text not null default 'topic';
+alter table public.reply_notifications drop constraint if exists reply_notifications_notification_type_check;
+alter table public.reply_notifications add constraint reply_notifications_notification_type_check check(notification_type in ('topic','reply'));
+create index if not exists reply_notifications_recipient_created_at on public.reply_notifications(recipient_id, created_at desc);
+create index if not exists reply_notifications_unread_recipient on public.reply_notifications(recipient_id) where read_at is null;
 
 create table if not exists public.post_votes (
   id uuid primary key default gen_random_uuid(),
-  topic_id uuid references public.topics (id) on delete cascade,
-  reply_id uuid references public.replies (id) on delete cascade,
-  voter_id uuid not null references public.profiles (id) on delete cascade,
+  topic_id uuid references public.topics(id) on delete cascade,
+  reply_id uuid references public.replies(id) on delete cascade,
+  voter_id uuid not null references public.profiles(id) on delete cascade,
   is_positive boolean not null default true,
   is_moderator boolean not null default false,
   is_pi boolean not null default false,
   created_at timestamptz not null default now(),
-  constraint post_votes_one_target check (num_nonnulls(topic_id, reply_id) = 1)
+  constraint post_votes_one_target check(num_nonnulls(topic_id, reply_id)=1)
 );
-
-alter table public.post_votes
-  add column if not exists is_positive boolean not null default true;
-
-create unique index if not exists post_votes_topic_voter
-  on public.post_votes (topic_id, voter_id)
-  where topic_id is not null;
-create unique index if not exists post_votes_reply_voter
-  on public.post_votes (reply_id, voter_id)
-  where reply_id is not null;
-create index if not exists post_votes_voter_created_at
-  on public.post_votes (voter_id, created_at desc);
-
-alter table public.post_votes enable row level security;
+alter table public.post_votes add column if not exists is_positive boolean not null default true;
+create unique index if not exists post_votes_topic_voter on public.post_votes(topic_id,voter_id) where topic_id is not null;
+create unique index if not exists post_votes_reply_voter on public.post_votes(reply_id,voter_id) where reply_id is not null;
+create index if not exists post_votes_voter_created_at on public.post_votes(voter_id,created_at desc);
 
 create table if not exists public.post_voting_settings (
-  singleton boolean primary key default true check (singleton),
+  singleton boolean primary key default true check(singleton),
   early_voting_starts_at timestamptz not null,
   early_voting_ends_at timestamptz not null
 );
+insert into public.post_voting_settings(singleton,early_voting_starts_at,early_voting_ends_at)
+values(true,now(),now()+interval '14 days') on conflict(singleton) do nothing;
 
-insert into public.post_voting_settings (singleton, early_voting_starts_at, early_voting_ends_at)
-values (true, now(), now() + interval '14 days')
-on conflict (singleton) do nothing;
+-- Current board baseline. Existing boards keep their rows; only the title/description/category/position are refreshed.
+update public.boards set position = position + 100000;
+insert into public.boards(slug,title,description,category,position) values
+('general','Any&All','if you dont know where to post, then uh post here','BOARDS',1),
+('clips-images','Any&All Clips & Images','mom, mom get the camera','BOARDS',2),
+('art','Any&All Art','i suck at drawing','BOARDS',3),
+('games-recommendations','Any&All Games','Toxic Positivity.','BOARDS',4),
+('anime','Any&All Anime','I am NOT watching all 1000+ episodes of One piece; use spoiler warnings as needed.','EVEN MORE BOARDS',5),
+('movies-tv','Any&All Movies & TV','talk about real television only. like Bubble Guppies or Pete the Cat','EVEN MORE BOARDS',6),
+('music-discussion','Any&All Music Discussion','Your niche indie artist sucks cuh','EVEN MORE BOARDS',7),
+('hobbies-projects','Any&All Hobbies & Projects','"Look at my cool shit"','EVEN MORE BOARDS',8),
+('tech','Any&All Tech','I require STP.','EVEN MORE BOARDS',9),
+('books-comics','Any&All Writing','do you wanna see my furry fanfiction?','EVEN MORE BOARDS',10),
+('lolwhat','lolwhat','lolwhat','EVEN MORE BOARDS',11),
+('question-of-the-day','Question of the Day Archive','Archive of the daily questions.','DAILY QUESTION',12)
+on conflict(slug) do update set title=excluded.title,description=excluded.description,category=excluded.category,position=excluded.position;
 
-alter table public.post_voting_settings enable row level security;
-revoke all on public.post_voting_settings from public, anon, authenticated;
+insert into public.moderators(user_id)
+select id from public.profiles where lower(username)='pi_'
+on conflict(user_id) do nothing;
 
-drop policy if exists "Post votes are publicly readable" on public.post_votes;
-create policy "Post votes are publicly readable"
-  on public.post_votes for select
-  using (true);
-
-create or replace view public.post_awards
-with (security_invoker = true)
-as
-with posts as (
-  select 'topic'::text as post_type, id as post_id, author_id
-  from public.topics
-),
-vote_summary as (
-  select
-    'topic'::text as post_type,
-    topic_id as post_id,
-    count(*)::integer as vote_count,
-    count(*) filter (where is_positive)::integer as positive_vote_count,
-    bool_or(is_positive) filter (where voter_id = (select auth.uid())) as user_vote,
-    coalesce(bool_or(voter_id = (select auth.uid())), false) as voted_by_user
-  from public.post_votes
-  where topic_id is not null
-  group by 1, 2
-)
-select
-  p.post_type,
-  p.post_id,
-  p.author_id,
-  coalesce(v.vote_count, 0)::integer as vote_count,
-  coalesce(v.voted_by_user, false) as voted_by_user,
-  coalesce(v.positive_vote_count, 0)::integer as positive_vote_count,
-  round(v.positive_vote_count::numeric / nullif(v.vote_count, 0), 2) as post_rating,
-  v.user_vote
-from posts p
-left join vote_summary v using (post_type, post_id);
-
-drop function if exists public.cast_post_vote(uuid, uuid);
-
-create or replace function public.cast_post_vote(
-  p_topic_id uuid default null,
-  p_reply_id uuid default null,
-  p_is_positive boolean default true
-)
-returns void
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  voter_user_id uuid := auth.uid();
-  target_author_id uuid;
-  account_created_at timestamptz;
-  early_voting_starts_at timestamptz;
-  early_voting_ends_at timestamptz;
-  vote_day_start timestamptz;
-  daily_vote_count integer;
-  voter_is_moderator boolean;
-  voter_is_pi boolean;
-begin
-  if voter_user_id is null then
-    raise exception 'Sign in to rate a post.';
-  end if;
-
-  if (p_topic_id is null) = (p_reply_id is null) then
-    raise exception 'Choose exactly one post to rate.';
-  end if;
-
-  if p_reply_id is not null then
-    raise exception 'Only topic posts can be rated.';
-  end if;
-
-  perform pg_advisory_xact_lock(hashtextextended(voter_user_id::text, 0));
-
-  select author_id into target_author_id
-  from public.topics
-  where id = p_topic_id;
-
-  if target_author_id is null then
-    raise exception 'This post no longer exists.';
-  end if;
-
-  if target_author_id = voter_user_id then
-    raise exception 'You cannot vote on your own post.';
-  end if;
-
-  if exists (
-    select 1 from public.post_votes
-    where topic_id = p_topic_id and voter_id = voter_user_id
-  ) then
-    raise exception 'You have already rated this post.';
-  end if;
-
-  select created_at into account_created_at
-  from public.profiles
-  where id = voter_user_id;
-
-  select settings.early_voting_starts_at, settings.early_voting_ends_at
-  into early_voting_starts_at, early_voting_ends_at
-  from public.post_voting_settings settings
-  where settings.singleton;
-
-  if early_voting_starts_at is null or early_voting_ends_at is null then
-    raise exception 'Voting eligibility settings are not configured.';
-  end if;
-
-  if account_created_at is null or (
-    account_created_at > now() - interval '14 days'
-    and not (
-      (now() >= early_voting_starts_at and now() < early_voting_ends_at)
-      or (
-        account_created_at >= early_voting_starts_at
-        and account_created_at < early_voting_ends_at
-      )
-    )
-  ) then
-    raise exception 'Your account must be at least 14 days old to vote.';
-  end if;
-
-  select exists (
-    select 1 from public.moderators where user_id = voter_user_id
-  ) into voter_is_moderator;
-
-  if not voter_is_moderator then
-    vote_day_start := date_trunc('day', now() at time zone 'UTC') at time zone 'UTC';
-    select count(*)::integer into daily_vote_count
-    from public.post_votes
-    where topic_id is not null
-      and voter_id = voter_user_id
-      and created_at >= vote_day_start;
-
-    if daily_vote_count >= 3 then
-      raise exception 'You have reached the limit of 3 ratings for today.';
-    end if;
-  end if;
-
-  select exists (
-    select 1 from public.profiles where id = voter_user_id and username = 'pi_'
-  ) into voter_is_pi;
-
-  insert into public.post_votes (topic_id, reply_id, voter_id, is_positive, is_moderator, is_pi)
-  values (p_topic_id, p_reply_id, voter_user_id, p_is_positive, voter_is_moderator, voter_is_pi);
-end;
-$$;
-
-revoke all on public.post_votes from public, anon, authenticated;
-grant select on public.post_votes to anon, authenticated;
-revoke all on function public.cast_post_vote(uuid, uuid, boolean) from public, anon, authenticated;
-grant execute on function public.cast_post_vote(uuid, uuid, boolean) to authenticated;
-grant select on public.post_awards to anon, authenticated;
-
-update public.boards
-set position = position + (
-  select coalesce(max(position), 0) - coalesce(min(position), 0) + 1
-  from public.boards
-);
-
-delete from public.boards
-where slug = 'modern-games';
-
-update public.boards
-set position = (select coalesce(max(position), 0) + 1 from public.boards)
-where slug = 'rathner';
-
-update public.boards
-set slug = case slug
-  when 'dos-windows' then 'general'
-  when 'adventure-games' then 'clips-images'
-  when 'simulations' then 'art'
-  when 'shareware' then 'games-recommendations'
-  when 'nintendo-classics' then 'nintendo'
-  when 'playstation-classics' then 'playstation'
-  when 'xbox-classics' then 'xbox'
-  when 'sega-other-classics' then 'sega-other-consoles'
-  when 'off-topic' then 'general-2'
-  when 'music' then 'music-discussion'
-  else slug
-end
-where slug in (
-  'dos-windows', 'adventure-games', 'simulations', 'shareware',
-  'nintendo-classics', 'playstation-classics', 'xbox-classics',
-  'sega-other-classics', 'off-topic', 'music'
-);
-
-insert into public.boards (slug, title, description, category, position)
-values
-  ('general', 'Any&All', 'if you dont know where to post, then uh post here', 'BOARDS', 1),
-  ('clips-images', 'Any&All Clips & Images', 'mom, mom get the camera', 'BOARDS', 2),
-  ('art', 'Any&All Art', 'i suck at drawing', 'BOARDS', 3),
-  ('games-recommendations', 'Any&All Games', 'Toxic Positivity.', 'BOARDS', 4),
-  ('anime', 'Any&All Anime', 'I am NOT watching all 1000+ episodes of One piece; use spoiler warnings as needed.', 'EVEN MORE BOARDS', 5),
-  ('movies-tv', 'Any&All Movies & TV', 'real television only. like Bubble Guppies or Pete the Cat', 'EVEN MORE BOARDS', 6),
-  ('music-discussion', 'Any&All Music Discussion', 'Your niche indie artist sucks cuh', 'EVEN MORE BOARDS', 7),
-  ('hobbies-projects', 'Any&All Hobbies & Projects', '"Look at my cool shit"', 'EVEN MORE BOARDS', 8),
-  ('tech', 'Any&All Tech', 'I require STP.', 'EVEN MORE BOARDS', 9),
-  ('books-comics', 'Any&All Writing', '1984, ferinheight 451, the other greats; use spoiler warnings as needed.', 'EVEN MORE BOARDS', 10),
-  ('lolwhat', 'lolwhat', 'cesspool', 'EVEN MORE BOARDS', 11),
-  ('question-of-the-day', 'Question of the Day Archive', 'Archive of the daily questions.', 'DAILY QUESTION', 12)
-on conflict (slug) do update set
-  title = excluded.title,
-  description = excluded.description,
-  category = excluded.category,
-  position = excluded.position;
-
-delete from public.moderators
-where user_id in (
-  select id from public.profiles
-  where lower(btrim(username)) = 'iloveturdsandpopps'
-);
-
-insert into public.board_moderators (user_id, board_id)
-select profiles.id, boards.id
-from public.profiles
-cross join public.boards
-where lower(btrim(profiles.username)) = 'iloveturdsandpopps'
-  and boards.slug = 'rathner'
-on conflict (user_id, board_id) do nothing;
-
-update public.topics
-set board_id = (select id from public.boards where slug = 'art')
-where board_id = (select id from public.boards where slug = 'art-projects');
-
-update public.topics
-set board_id = (select id from public.boards where slug = 'general')
-where board_id in (
-  select id
-  from public.boards
-  where lower(btrim(title)) in ('tech & internet', 'food & drink')
-);
-
-update public.topics
-set board_id = (select id from public.boards where slug = 'general')
-where board_id = (select id from public.boards where slug = 'general-2');
-
-delete from public.boards
-where slug in (
-  'art-projects', 'rpg-strategy', 'action-shooters',
-  'nintendo', 'playstation', 'xbox', 'sega-other-consoles'
-);
-
-delete from public.boards
-where slug = 'general-2';
-
-delete from public.boards
-where lower(btrim(title)) in ('tech & internet', 'food & drink');
-
+-- Auth profile creation and reserved usernames
 create or replace function public.create_profile_for_new_user()
-returns trigger
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  requested_username text;
+returns trigger language plpgsql security definer set search_path='' as $$
+declare requested_username text; candidate text; suffix integer := 0;
 begin
-  requested_username := new.raw_user_meta_data ->> 'username';
-
-  if requested_username is null or requested_username !~ '^[A-Za-z0-9_]{3,24}$' then
-    requested_username := 'member_' || left(new.id::text, 8);
-  end if;
-  if public.is_reserved_username(requested_username) then
-    raise exception 'That forum name is reserved for staff or the site owner.';
-  end if;
-
-  insert into public.profiles (id, username)
-  values (new.id, requested_username);
+  requested_username := new.raw_user_meta_data->>'username';
+  if requested_username is null or requested_username !~ '^[A-Za-z0-9_]{3,24}$' then requested_username := 'member_'||left(new.id::text,8); end if;
+  if public.is_reserved_username(requested_username) then raise exception 'That forum name is reserved for staff or the site owner.'; end if;
+  candidate := requested_username;
+  while exists(select 1 from public.profiles where lower(username)=lower(candidate)) loop
+    suffix := suffix+1;
+    candidate := left(requested_username,24-length(suffix::text))||suffix::text;
+  end loop;
+  insert into public.profiles(id,username) values(new.id,candidate);
   return new;
 end;
 $$;
-
 drop trigger if exists on_auth_user_created_profile on auth.users;
-create trigger on_auth_user_created_profile
-  after insert on auth.users
-  for each row execute procedure public.create_profile_for_new_user();
+create trigger on_auth_user_created_profile after insert on auth.users for each row execute procedure public.create_profile_for_new_user();
+
+create or replace function public.validate_reply_parent()
+returns trigger language plpgsql set search_path='' as $$
+declare parent_topic_id uuid;
+begin
+  if new.parent_reply_id is null then return new; end if;
+  if new.parent_reply_id=new.id then raise exception 'A reply cannot target itself.'; end if;
+  select topic_id into parent_topic_id from public.replies where id=new.parent_reply_id;
+  if parent_topic_id is null then raise exception 'The reply being referenced no longer exists.'; end if;
+  if parent_topic_id<>new.topic_id then raise exception 'Replies can only target a reply in the same topic.'; end if;
+  return new;
+end;
+$$;
+drop trigger if exists validate_reply_parent on public.replies;
+create trigger validate_reply_parent before insert or update of parent_reply_id,topic_id on public.replies for each row execute procedure public.validate_reply_parent();
+
+create or replace function public.enforce_daily_question_topic_dates()
+returns trigger language plpgsql set search_path='' as $$
+declare daily boolean;
+begin
+  if tg_op='INSERT' then
+    select slug='question-of-the-day' into daily from public.boards where id=new.board_id;
+    if daily then new.created_at:=now(); end if; 
+    return new;
+  end if;
+  select slug='question-of-the-day' into daily from public.boards where id=old.board_id;
+  if daily then
+    if old.board_id is distinct from new.board_id then raise exception 'Daily question topics cannot be moved to another board.'; end if;
+    if old.created_at is distinct from new.created_at then raise exception 'Daily question creation times cannot be changed.'; end if;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists enforce_daily_question_topic_dates on public.topics;
+create trigger enforce_daily_question_topic_dates before insert or update of board_id,created_at on public.topics for each row execute procedure public.enforce_daily_question_topic_dates();
+
+create or replace function public.prevent_non_moderator_topic_pin_change()
+returns trigger language plpgsql security definer set search_path='' as $$
+begin
+  if new.is_pinned is distinct from old.is_pinned and not public.can_moderate_board(new.board_id) then raise exception 'Only moderators of this board can pin or unpin topics.'; end if;
+  return new;
+end;
+$$;
+drop trigger if exists enforce_moderator_topic_pinning on public.topics;
+create trigger enforce_moderator_topic_pinning before update of is_pinned on public.topics for each row execute procedure public.prevent_non_moderator_topic_pin_change();
+
+create or replace function public.prevent_non_moderator_topic_feature_change()
+returns trigger language plpgsql security definer set search_path='' as $$
+begin
+  if new.is_featured is distinct from old.is_featured and not exists(select 1 from public.moderators where user_id=(select auth.uid())) then raise exception 'Only moderators can feature or unfeature topics.'; end if;
+  return new;
+end;
+$$;
+drop trigger if exists enforce_moderator_topic_featuring on public.topics;
+create trigger enforce_moderator_topic_featuring before update of is_featured on public.topics for each row execute procedure public.prevent_non_moderator_topic_feature_change();
 
 create or replace function public.touch_topic_on_reply()
-returns trigger
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  changed_topic_id uuid;
+returns trigger language plpgsql security definer set search_path='' as $$
 begin
-  changed_topic_id := case when tg_op = 'DELETE' then old.topic_id else new.topic_id end;
-  update public.topics
-  set updated_at = now()
-  where id = changed_topic_id;
+  update public.topics set updated_at=now() where id=(case when tg_op='DELETE' then old.topic_id else new.topic_id end);
   return null;
 end;
 $$;
-
 drop trigger if exists on_reply_change_touch_topic on public.replies;
-create trigger on_reply_change_touch_topic
-  after insert or delete on public.replies
-  for each row execute procedure public.touch_topic_on_reply();
+create trigger on_reply_change_touch_topic after insert or delete on public.replies for each row execute procedure public.touch_topic_on_reply();
 
 create or replace function public.notify_on_reply()
-returns trigger
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  topic_author_id uuid;
-  parent_author_id uuid;
+returns trigger language plpgsql security definer set search_path='' as $$
+declare topic_author_id uuid; parent_author_id uuid;
 begin
-  select author_id into topic_author_id
-  from public.topics
-  where id = new.topic_id;
-
-  if topic_author_id is not null and topic_author_id <> new.author_id then
-    insert into public.reply_notifications (recipient_id, reply_id, notification_type)
-    values (topic_author_id, new.id, 'topic')
-    on conflict (recipient_id, reply_id) do nothing;
+  select author_id into topic_author_id from public.topics where id=new.topic_id;
+  if topic_author_id is not null and topic_author_id<>new.author_id then
+    insert into public.reply_notifications(recipient_id,reply_id,notification_type) values(topic_author_id,new.id,'topic') on conflict(recipient_id,reply_id) do nothing;
   end if;
-
   if new.parent_reply_id is not null then
-    select author_id into parent_author_id
-    from public.replies
-    where id = new.parent_reply_id;
-
-    if parent_author_id is not null and parent_author_id <> new.author_id then
-      insert into public.reply_notifications (recipient_id, reply_id, notification_type)
-      values (parent_author_id, new.id, 'reply')
-      on conflict (recipient_id, reply_id)
-      do update set notification_type = excluded.notification_type;
+    select author_id into parent_author_id from public.replies where id=new.parent_reply_id;
+    if parent_author_id is not null and parent_author_id<>new.author_id then
+      insert into public.reply_notifications(recipient_id,reply_id,notification_type) values(parent_author_id,new.id,'reply') on conflict(recipient_id,reply_id) do update set notification_type=excluded.notification_type;
     end if;
   end if;
   return new;
 end;
 $$;
-
 drop trigger if exists on_reply_create_notification on public.replies;
-create trigger on_reply_create_notification
-  after insert on public.replies
-  for each row execute procedure public.notify_on_reply();
-
-alter table public.profiles enable row level security;
-alter table public.boards enable row level security;
-alter table public.topics enable row level security;
-alter table public.replies enable row level security;
-alter table public.reply_notifications enable row level security;
-
-drop policy if exists "Profiles are publicly readable" on public.profiles;
-create policy "Profiles are publicly readable"
-  on public.profiles for select
-  using (true);
-
-drop policy if exists "Users can update their own profile" on public.profiles;
-create policy "Users can update their own profile"
-  on public.profiles for update to authenticated
-  using ((select auth.uid()) = id)
-  with check ((select auth.uid()) = id);
-
-drop policy if exists "Boards are publicly readable" on public.boards;
-create policy "Boards are publicly readable"
-  on public.boards for select
-  using (true);
-
-drop policy if exists "Topics are publicly readable" on public.topics;
-create policy "Topics are publicly readable"
-  on public.topics for select
-  using (true);
-
-drop policy if exists "Signed-in members can create topics as themselves" on public.topics;
-create policy "Signed-in members can create topics as themselves"
-  on public.topics for insert to authenticated
-  with check (
-    (select auth.uid()) = author_id
-    and exists (
-      select 1
-      from public.boards
-      where id = board_id
-        and (
-          slug <> 'question-of-the-day'
-          or exists (
-            select 1 from public.moderators
-            where user_id = (select auth.uid())
-          )
-        )
-    )
-  );
-
-drop policy if exists "Members can edit their own topics" on public.topics;
-create policy "Members can edit their own topics"
-  on public.topics for update to authenticated
-  using (
-    (select auth.uid()) = author_id
-    and (
-      not exists (
-        select 1 from public.boards
-        where id = board_id and slug = 'question-of-the-day'
-      )
-      or created_at > now() - interval '24 hours'
-    )
-  )
-  with check (
-    (select auth.uid()) = author_id
-    and (
-      not exists (
-        select 1 from public.boards
-        where id = board_id and slug = 'question-of-the-day'
-      )
-      or created_at > now() - interval '24 hours'
-    )
-  );
-
-drop policy if exists "Members can delete their own topics" on public.topics;
-create policy "Members can delete their own topics"
-  on public.topics for delete to authenticated
-  using (
-    (
-      (select auth.uid()) = author_id
-      and (
-        not exists (
-          select 1 from public.boards
-          where id = board_id and slug = 'question-of-the-day'
-        )
-        or created_at > now() - interval '24 hours'
-      )
-    )
-    or public.can_moderate_board(board_id)
-  );
-
-drop policy if exists "Replies are publicly readable" on public.replies;
-create policy "Replies are publicly readable"
-  on public.replies for select
-  using (true);
-
-drop policy if exists "Signed-in members can reply as themselves" on public.replies;
-create policy "Signed-in members can reply as themselves"
-  on public.replies for insert to authenticated
-  with check (
-    (select auth.uid()) = author_id
-    and exists (
-      select 1
-      from public.topics
-      join public.boards on boards.id = topics.board_id
-      where topics.id = topic_id
-        and (
-          boards.slug <> 'question-of-the-day'
-          or topics.created_at > now() - interval '24 hours'
-        )
-    )
-  );
-
-drop policy if exists "Members can edit their own replies" on public.replies;
-create policy "Members can edit their own replies"
-  on public.replies for update to authenticated
-  using (
-    (select auth.uid()) = author_id
-    and exists (
-      select 1
-      from public.topics
-      join public.boards on boards.id = topics.board_id
-      where topics.id = topic_id
-        and (
-          boards.slug <> 'question-of-the-day'
-          or topics.created_at > now() - interval '24 hours'
-        )
-    )
-  )
-  with check (
-    (select auth.uid()) = author_id
-    and exists (
-      select 1
-      from public.topics
-      join public.boards on boards.id = topics.board_id
-      where topics.id = topic_id
-        and (
-          boards.slug <> 'question-of-the-day'
-          or topics.created_at > now() - interval '24 hours'
-        )
-    )
-  );
-
-drop policy if exists "Members can delete their own replies" on public.replies;
-create policy "Members can delete their own replies"
-  on public.replies for delete to authenticated
-  using (
-    (
-      (select auth.uid()) = author_id
-      and exists (
-        select 1
-        from public.topics
-        join public.boards on boards.id = topics.board_id
-        where topics.id = topic_id
-          and (
-            boards.slug <> 'question-of-the-day'
-            or topics.created_at > now() - interval '24 hours'
-          )
-      )
-    )
-    or exists (
-      select 1 from public.topics
-      where public.topics.id = public.replies.topic_id
-        and public.can_moderate_board(public.topics.board_id)
-    )
-  );
-
-drop policy if exists "Moderators can delete topic images" on storage.objects;
-create policy "Moderators can delete topic images"
-  on storage.objects for delete to authenticated
-  using (
-    bucket_id = 'topic-images'
-    and (
-      exists (
-        select 1 from public.moderators
-        where user_id = (select auth.uid())
-      )
-      or exists (
-        select 1
-        from public.topics
-        where public.can_moderate_board(public.topics.board_id)
-          and split_part(coalesce(public.topics.image_url, ''), '/topic-images/', 2) = storage.objects.name
-      )
-      or exists (
-        select 1
-        from public.replies
-        join public.topics on public.topics.id = public.replies.topic_id
-        where public.can_moderate_board(public.topics.board_id)
-          and split_part(coalesce(public.replies.image_url, ''), '/topic-images/', 2) = storage.objects.name
-      )
-    )
-  );
-
-drop policy if exists "Members can read their reply notifications" on public.reply_notifications;
-create policy "Members can read their reply notifications"
-  on public.reply_notifications for select to authenticated
-  using ((select auth.uid()) = recipient_id);
+create trigger on_reply_create_notification after insert on public.replies for each row execute procedure public.notify_on_reply();
 
 create or replace function public.mark_reply_notification_read(p_notification_id uuid)
-returns void
-language plpgsql
-security definer
-set search_path = ''
-as $$
+returns void language plpgsql security definer set search_path='' as $$
 begin
-  if auth.uid() is null then
-    raise exception 'Sign in to update notifications.';
-  end if;
-
-  update public.reply_notifications
-  set read_at = coalesce(read_at, now())
-  where id = p_notification_id
-    and recipient_id = (select auth.uid());
-  if not found then
-    raise exception 'This notification is unavailable.';
-  end if;
+  if auth.uid() is null then raise exception 'Sign in to update notifications.'; end if;
+  update public.reply_notifications set read_at=coalesce(read_at,now()) where id=p_notification_id and recipient_id=(select auth.uid());
+  if not found then raise exception 'This notification is unavailable.'; end if;
 end;
 $$;
-
 revoke all on function public.mark_reply_notification_read(uuid) from public, anon, authenticated;
 grant execute on function public.mark_reply_notification_read(uuid) to authenticated;
 
-revoke all on public.reply_notifications from public, anon, authenticated;
-grant select on public.reply_notifications to authenticated;
+create or replace function public.set_topic_pinned(p_topic_id uuid,p_is_pinned boolean)
+returns void language plpgsql security definer set search_path='' as $$
+begin
+  if not exists(select 1 from public.topics where id=p_topic_id) then raise exception 'This topic no longer exists.'; end if;
+  if not exists(select 1 from public.topics where id=p_topic_id and public.can_moderate_board(board_id)) then raise exception 'Moderator access to this board is required to pin or unpin topics.'; end if;
+  update public.topics set is_pinned=p_is_pinned where id=p_topic_id;
+end;
+$$;
+revoke all on function public.set_topic_pinned(uuid,boolean) from public, anon, authenticated;
+grant execute on function public.set_topic_pinned(uuid,boolean) to authenticated;
 
-grant select on public.boards, public.profiles, public.topics, public.replies to anon, authenticated;
+create or replace function public.set_topic_featured(p_topic_id uuid,p_is_featured boolean)
+returns void language plpgsql security definer set search_path='' as $$
+begin
+  if not exists(select 1 from public.moderators where user_id=(select auth.uid())) then raise exception 'Moderator access is required to feature or unfeature topics.'; end if;
+  lock table public.topics in share row exclusive mode;
+  if not exists(select 1 from public.topics where id=p_topic_id) then raise exception 'This topic no longer exists.'; end if;
+  if p_is_featured then update public.topics set is_featured=false where is_featured and id<>p_topic_id; end if;
+  update public.topics set is_featured=p_is_featured where id=p_topic_id;
+end;
+$$;
+revoke all on function public.set_topic_featured(uuid,boolean) from public, anon, authenticated;
+grant execute on function public.set_topic_featured(uuid,boolean) to authenticated;
+
+-- Row level security
+alter table public.profiles enable row level security;
+alter table public.moderators enable row level security;
+alter table public.boards enable row level security;
+alter table public.board_moderators enable row level security;
+alter table public.topics enable row level security;
+alter table public.replies enable row level security;
+alter table public.reply_notifications enable row level security;
+alter table public.forum_news enable row level security;
+alter table public.post_votes enable row level security;
+alter table public.post_voting_settings enable row level security;
+
+-- Public read policies
+drop policy if exists "Profiles are publicly readable" on public.profiles;
+create policy "Profiles are publicly readable" on public.profiles for select using(true);
+drop policy if exists "Users can update their own profile" on public.profiles;
+create policy "Users can update their own profile" on public.profiles for update to authenticated using((select auth.uid())=id) with check((select auth.uid())=id);
+drop policy if exists "Moderator status is publicly readable" on public.moderators;
+create policy "Moderator status is publicly readable" on public.moderators for select using(true);
+drop policy if exists "Board moderator assignments are publicly readable" on public.board_moderators;
+create policy "Board moderator assignments are publicly readable" on public.board_moderators for select using(true);
+drop policy if exists "Boards are publicly readable" on public.boards;
+create policy "Boards are publicly readable" on public.boards for select using(true);
+drop policy if exists "Forum news is publicly readable" on public.forum_news;
+create policy "Forum news is publicly readable" on public.forum_news for select using(true);
+drop policy if exists "Moderators can update forum news" on public.forum_news;
+create policy "Moderators can update forum news" on public.forum_news for update to authenticated using(exists(select 1 from public.moderators where user_id=(select auth.uid()))) with check(exists(select 1 from public.moderators where user_id=(select auth.uid())));
+drop policy if exists "Topics are publicly readable" on public.topics;
+create policy "Topics are publicly readable" on public.topics for select using(true);
+drop policy if exists "Replies are publicly readable" on public.replies;
+create policy "Replies are publicly readable" on public.replies for select using(true);
+
+drop policy if exists "Signed-in members can create topics as themselves" on public.topics;
+create policy "Signed-in members can create topics as themselves" on public.topics for insert to authenticated with check((select auth.uid())=author_id and exists(select 1 from public.boards where id=board_id and (slug<> 'question-of-the-day' or exists(select 1 from public.moderators where user_id=(select auth.uid())))));
+drop policy if exists "Members can edit their own topics" on public.topics;
+create policy "Members can edit their own topics" on public.topics for update to authenticated using((select auth.uid())=author_id and (not exists(select 1 from public.boards where id=board_id and slug='question-of-the-day') or created_at>now()-interval '24 hours')) with check((select auth.uid())=author_id and (not exists(select 1 from public.boards where id=board_id and slug='question-of-the-day') or created_at>now()-interval '24 hours'));
+drop policy if exists "Members can delete their own topics" on public.topics;
+create policy "Members can delete their own topics" on public.topics for delete to authenticated using(((select auth.uid())=author_id and (not exists(select 1 from public.boards where id=board_id and slug='question-of-the-day') or created_at>now()-interval '24 hours')) or public.can_moderate_board(board_id));
+
+drop policy if exists "Signed-in members can reply as themselves" on public.replies;
+create policy "Signed-in members can reply as themselves" on public.replies for insert to authenticated with check((select auth.uid())=author_id and exists(select 1 from public.topics join public.boards on boards.id=topics.board_id where topics.id=topic_id and (boards.slug<> 'question-of-the-day' or topics.created_at>now()-interval '24 hours')));
+drop policy if exists "Members can edit their own replies" on public.replies;
+create policy "Members can edit their own replies" on public.replies for update to authenticated using((select auth.uid())=author_id and exists(select 1 from public.topics join public.boards on boards.id=topics.board_id where topics.id=topic_id and (boards.slug<> 'question-of-the-day' or topics.created_at>now()-interval '24 hours'))) with check((select auth.uid())=author_id and exists(select 1 from public.topics join public.boards on boards.id=topics.board_id where topics.id=topic_id and (boards.slug<> 'question-of-the-day' or topics.created_at>now()-interval '24 hours')));
+drop policy if exists "Members can delete their own replies" on public.replies;
+create policy "Members can delete their own replies" on public.replies for delete to authenticated using((((select auth.uid())=author_id) and exists(select 1 from public.topics join public.boards on boards.id=topics.board_id where topics.id=topic_id and (boards.slug<> 'question-of-the-day' or topics.created_at>now()-interval '24 hours'))) or exists(select 1 from public.topics where public.topics.id=public.replies.topic_id and public.can_moderate_board(public.topics.board_id)));
+
+drop policy if exists "Members can read their reply notifications" on public.reply_notifications;
+create policy "Members can read their reply notifications" on public.reply_notifications for select to authenticated using((select auth.uid())=recipient_id);
+drop policy if exists "Post votes are publicly readable" on public.post_votes;
+create policy "Post votes are publicly readable" on public.post_votes for select using(true);
+
+-- Awards view for topic ratings
+do $$ begin
+  if exists(select 1 from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relname='post_awards' and c.relkind in ('v','m')) then
+    execute 'drop view if exists public.post_awards cascade';
+  end if;
+exception when others then null;
+end $$;
+create view public.post_awards with (security_invoker=true) as
+with vote_summary as (
+  select topic_id as post_id,count(*)::integer vote_count,count(*) filter(where is_positive)::integer positive_vote_count,
+         bool_or(is_positive) filter(where voter_id=(select auth.uid())) user_vote,
+         coalesce(bool_or(voter_id=(select auth.uid())),false) voted_by_user
+  from public.post_votes where topic_id is not null group by topic_id
+)
+select p.post_type,p.post_id,p.author_id,
+       coalesce(v.vote_count,0)::integer vote_count,coalesce(v.voted_by_user,false) voted_by_user,
+       coalesce(v.positive_vote_count,0)::integer positive_vote_count,
+       round(v.positive_vote_count::numeric/nullif(v.vote_count,0),2) post_rating,v.user_vote
+from (select 'topic'::text post_type,id post_id,author_id from public.topics) p
+left join vote_summary v on v.post_id=p.post_id;
+
+-- Voting RPC
+drop function if exists public.cast_post_vote(uuid,uuid);
+create or replace function public.cast_post_vote(p_topic_id uuid default null,p_reply_id uuid default null,p_is_positive boolean default true)
+returns void language plpgsql security definer set search_path='' as $$
+declare voter_user_id uuid := auth.uid(); target_author_id uuid; account_created_at timestamptz; early_start timestamptz; early_end timestamptz; vote_day_start timestamptz; daily_count integer; is_mod boolean; is_pi boolean;
+begin
+  if voter_user_id is null then raise exception 'Sign in to rate a post.'; end if;
+  if (p_topic_id is null)= (p_reply_id is null) then raise exception 'Choose exactly one post to rate.'; end if;
+  if p_reply_id is not null then raise exception 'Only topic posts can be rated.'; end if;
+  perform pg_advisory_xact_lock(hashtextextended(voter_user_id::text,0));
+  select author_id into target_author_id from public.topics where id=p_topic_id;
+  if target_author_id is null then raise exception 'This post no longer exists.'; end if;
+  if target_author_id=voter_user_id then raise exception 'You cannot vote on your own post.'; end if;
+  if exists(select 1 from public.post_votes where topic_id=p_topic_id and voter_id=voter_user_id) then raise exception 'You have already rated this post.'; end if;
+  select created_at into account_created_at from public.profiles where id=voter_user_id;
+  select early_voting_starts_at,early_voting_ends_at into early_start,early_end from public.post_voting_settings where singleton;
+  if early_start is null or early_end is null then raise exception 'Voting eligibility settings are not configured.'; end if;
+  if account_created_at is null or (account_created_at>now()-interval '14 days' and not ((now()>=early_start and now()<early_end) or (account_created_at>=early_start and account_created_at<early_end))) then raise exception 'Your account must be at least 14 days old to vote.'; end if;
+  select exists(select 1 from public.moderators where user_id=voter_user_id) into is_mod;
+  if not is_mod then
+    vote_day_start := date_trunc('day',now() at time zone 'UTC') at time zone 'UTC';
+    select count(*)::integer into daily_count from public.post_votes where topic_id is not null and voter_id=voter_user_id and created_at>=vote_day_start;
+    if daily_count>=3 then raise exception 'You have reached the limit of 3 ratings for today.'; end if;
+  end if;
+  select exists(select 1 from public.profiles where id=voter_user_id and lower(username)= 'pi_') into is_pi;
+  insert into public.post_votes(topic_id,reply_id,voter_id,is_positive,is_moderator,is_pi) values(p_topic_id,p_reply_id,voter_user_id,p_is_positive,is_mod,is_pi);
+end;
+$$;
+
+-- Grants
+revoke all on public.moderators,public.board_moderators,public.forum_news,public.post_votes,public.post_voting_settings,public.reply_notifications from public,anon,authenticated;
+grant select on public.moderators,public.board_moderators,public.boards,public.profiles,public.topics,public.replies,public.forum_news,public.post_awards to anon,authenticated;
 grant update on public.profiles to authenticated;
-grant insert, update, delete on public.topics, public.replies to authenticated;
+grant insert,update,delete on public.topics,public.replies to authenticated;
+grant select on public.reply_notifications to authenticated;
+grant update on public.forum_news to authenticated;
+grant select on public.post_votes,public.post_voting_settings to anon,authenticated;
+revoke all on function public.cast_post_vote(uuid,uuid,boolean) from public,anon,authenticated;
+grant execute on function public.cast_post_vote(uuid,uuid,boolean) to authenticated;
