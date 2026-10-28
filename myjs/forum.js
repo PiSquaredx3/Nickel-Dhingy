@@ -58,6 +58,17 @@ let notificationCountRequest = 0;
 const membersPerPage = 25;
 const dailyQuestionBoardSlug = "question-of-the-day";
 const dailyQuestionDurationMs = 24 * 60 * 60 * 1000;
+const themeStorageKey = "nickel-dhingy-site-theme";
+const holidayThemes = {
+  "christmas": "Christmas",
+  "new-year": "New Year",
+  "valentine": "Valentine's Day",
+  "st-patrick": "St. Patrick's Day",
+  "easter": "Easter",
+  "fourth-of-july": "Fourth of July",
+  "thanksgiving": "Thanksgiving",
+  "halloween": "Halloween"
+};
 
 const siteTitles = [
   "Another Retro Gaming Larping Forum",
@@ -100,6 +111,7 @@ const emojiNames = [
 if (siteTitle) {
   siteTitle.textContent = siteTitles[Math.floor(Math.random() * siteTitles.length)];
 }
+applySiteTheme("auto");
 
 function setForumMessage(message, isError = false) {
   forumMessage.textContent = message;
@@ -223,6 +235,123 @@ function setStat(name, value) {
   });
 }
 
+function easterSunday(year) {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(year, month - 1, day);
+}
+
+function thanksgivingDate(year) {
+  const novemberFirst = new Date(year, 10, 1);
+  const firstThursdayOffset = (4 - novemberFirst.getDay() + 7) % 7;
+  return new Date(year, 10, 1 + firstThursdayOffset + 21);
+}
+
+function dateIsWithin(date, startMonth, startDay, endMonth, endDay) {
+  const year = date.getFullYear();
+  const start = new Date(year, startMonth - 1, startDay);
+  const end = new Date(year, endMonth - 1, endDay);
+  if (end < start) {
+    if (date < start && date.getFullYear() === year) end.setFullYear(year + 1);
+  }
+  const value = new Date(year, date.getMonth(), date.getDate()).getTime();
+  return value >= start.getTime() && value <= end.getTime();
+}
+
+function getAutomaticHolidayTheme(date = new Date()) {
+  const easter = easterSunday(date.getFullYear());
+  const easterEnd = new Date(easter);
+  easterEnd.setDate(easter.getDate() + 6);
+  const thanksgiving = thanksgivingDate(date.getFullYear());
+  const thanksgivingEnd = new Date(thanksgiving);
+  thanksgivingEnd.setDate(thanksgiving.getDate() + 3);
+  const thanksgivingStart = new Date(thanksgiving);
+  thanksgivingStart.setDate(thanksgiving.getDate() - 3);
+
+  const value = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  if (value >= easter.getTime() && value <= easterEnd.getTime()) return "easter";
+  if (value >= thanksgivingStart.getTime() && value <= thanksgivingEnd.getTime()) return "thanksgiving";
+  if ((date.getMonth() === 11 && date.getDate() === 31) || (date.getMonth() === 0 && date.getDate() <= 7)) return "new-year";
+  if (dateIsWithin(date, 12, 18, 12, 24)) return "christmas";
+  if (dateIsWithin(date, 12, 25, 12, 31)) return "christmas";
+  if (dateIsWithin(date, 2, 7, 2, 14)) return "valentine";
+  if (dateIsWithin(date, 3, 14, 3, 17)) return "st-patrick";
+  if (dateIsWithin(date, 6, 29, 7, 5)) return "fourth-of-july";
+  if (dateIsWithin(date, 10, 24, 10, 31)) return "halloween";
+  return "default";
+}
+
+function updateSiteLogo() {
+  const logo = document.querySelector("#site-logo");
+  if (!logo) return;
+
+  let logoName = "nickel-dhingy-logo.png";
+  if (document.body.classList.contains("rathner-board-theme")) {
+    logoName = "nickel-dhingy-logo-rathner.png";
+  } else if (document.body.classList.contains("holiday-christmas")) {
+    logoName = "nickel-dhingy-logo-christmas.png";
+  } else if (document.body.classList.contains("holiday-halloween")) {
+    logoName = "nickel-dhingy-logo-halloween.gif";
+  }
+
+  const logoUrl = `assets/logos/${logoName}`;
+  if (!logo.src.endsWith(logoUrl)) logo.src = logoUrl;
+}
+
+function applySiteTheme(theme) {
+  const selected = theme === "auto" ? getAutomaticHolidayTheme() : theme;
+  document.body.classList.remove(...Object.keys(holidayThemes).map(name => `holiday-${name}`));
+  document.body.classList.remove("holiday-default");
+  if (selected && selected !== "default") document.body.classList.add(`holiday-${selected}`);
+
+  const themeColors = {
+    "christmas": "#71899b", "new-year": "#171d43", "valentine": "#a3294d",
+    "st-patrick": "#174f2b", "easter": "#7b72a8", "fourth-of-july": "#243d73",
+    "thanksgiving": "#70421f", "halloween": "#8a3c00", "default": "#111b2d"
+  };
+  const themeMeta = document.querySelector('meta[name="theme-color"]');
+  if (themeMeta) themeMeta.content = themeColors[selected] || themeColors.default;
+  updateSiteLogo();
+}
+
+function setupAdminThemeControl(user) {
+  const links = document.querySelector("#account-links");
+  if (!moderatorIds.has(user?.id)) return;
+
+  let savedTheme = "default";
+  try { savedTheme = localStorage.getItem(themeStorageKey) || "auto"; } catch (error) {}
+  applySiteTheme(savedTheme);
+
+  const control = makeElement("label", "theme-control");
+  control.title = "Admin theme preview";
+  control.setAttribute("aria-label", "Site theme preview");
+  const select = document.createElement("select");
+  select.id = "admin-theme-select";
+  select.setAttribute("aria-label", "Site theme preview");
+  select.append(new Option("Auto (date)", "auto"));
+  select.append(new Option("Standard", "default"));
+  Object.entries(holidayThemes).forEach(([value, label]) => select.append(new Option(label, value)));
+  select.value = savedTheme;
+  select.addEventListener("change", () => {
+    try { localStorage.setItem(themeStorageKey, select.value); } catch (error) {}
+    applySiteTheme(select.value);
+  });
+  control.append(makeElement("span", "theme-control-label", "Theme"), select);
+  links.append(control);
+}
+
 function updateAccount(user) {
   const previousUserId = currentUser?.id;
   currentUser = user;
@@ -249,6 +378,7 @@ function updateAccount(user) {
       profileButton.append(moderatorBadge);
     }
     links.append(profileButton);
+    setupAdminThemeControl(user);
     const notificationControl = makeElement("span", "notification-control");
     const notificationsButton = makeButton("", "notifications", "notification-button");
     notificationsButton.setAttribute("aria-label", "Notifications");
@@ -1020,6 +1150,7 @@ async function showTopic(id) {
     const board = boards.find(item => item.id === topic.board_id);
     if (window.location.hash === `#topic/${id}`) {
       document.body.classList.toggle("rathner-board-theme", board?.slug === "rathner");
+      updateSiteLogo();
     }
     const isDailyQuestion = board?.slug === dailyQuestionBoardSlug;
     const closesAt = isDailyQuestion
@@ -1342,6 +1473,7 @@ function showComposer(slug) {
 function handleRoute() {
   const route = decodeURIComponent(window.location.hash.slice(1));
   document.body.classList.toggle("rathner-board-theme", route === "board/rathner");
+  updateSiteLogo();
   const isMembersPage = route === "members" || route.startsWith("members/");
   navLinks.forEach(link => {
     const active = link.dataset.pageNav === (isMembersPage ? "members" : "forums");
