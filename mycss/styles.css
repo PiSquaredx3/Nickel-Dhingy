@@ -906,6 +906,29 @@ button:active {
   overflow-wrap: anywhere;
 }
 
+.member-list-avatar {
+  position: relative;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid #647990;
+  background: linear-gradient(135deg, #596e86, #33445a);
+  color: #f0c66f;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.member-list-avatar img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .member-list-date {
   color: #8998aa;
   font-size: 10px;

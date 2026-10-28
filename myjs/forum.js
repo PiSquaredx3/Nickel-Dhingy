@@ -544,7 +544,7 @@ async function showMembers(pageNumber = 1) {
   try {
     const start = (page - 1) * membersPerPage;
     const { data, count, error } = await supabase.from("profiles")
-      .select("id,username,created_at", { count: "exact" })
+      .select("id,username,avatar_url,created_at", { count: "exact" })
       .order("created_at", { ascending: true })
       .order("id", { ascending: true })
       .range(start, start + membersPerPage - 1);
@@ -566,10 +566,20 @@ async function showMembers(pageNumber = 1) {
       const item = makeElement("li", "member-list-item");
       const memberNumber = makeElement("span", "member-number", `#${start + index + 1}`);
       const memberIdentity = makeElement("div", "member-list-identity");
+      const memberAvatar = makeElement("span", "member-list-avatar", member.username.slice(0, 1).toUpperCase());
+      const avatarImage = document.createElement("img");
+      const avatarUrl = safeHttpsUrl(member.avatar_url);
+      avatarImage.alt = `${member.username}'s profile picture`;
+      avatarImage.loading = "lazy";
+      setAvatarImage(avatarImage, avatarUrl);
+      if (avatarUrl) {
+        avatarImage.referrerPolicy = "no-referrer";
+      }
+      memberAvatar.append(avatarImage);
       const memberName = makeElement("strong", "member-list-name", member.username);
       const joinedDate = makeElement("time", "member-list-date", `Joined ${formatDateOnly(member.created_at)}`);
       joinedDate.dateTime = member.created_at;
-      memberIdentity.append(memberName);
+      memberIdentity.append(memberAvatar, memberName);
       appendMemberLabels(memberIdentity, member.id, null);
       item.append(memberNumber, memberIdentity, joinedDate);
       list.append(item);
